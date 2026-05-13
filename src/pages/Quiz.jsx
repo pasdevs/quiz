@@ -1,622 +1,314 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import Swal from 'sweetalert2';
 
 const API_URL = import.meta.env.VITE_API_LEAD_URL;
 
 // ============================================================
-// GLOBAL CSS — Dark theme, mirrors v3 HTML 1:1
+// GLOBAL CSS — v5 Gold Theme
 // ============================================================
 const GLOBAL_CSS = `
   @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap');
 
   *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
+  :root {
+    --bg:#0D0F1A; --bg2:#13162A; --bg3:#1C2038; --card:#1E2240;
+    --border:rgba(255,255,255,.08); --border2:rgba(255,255,255,.14);
+    --text:#F0EDE8; --muted:rgba(240,237,232,.5); --muted2:rgba(240,237,232,.28);
+    --gold:#F5C842; --gold2:rgba(245,200,66,.15); --gold3:rgba(245,200,66,.08);
+    --accent:#7C6EF5; --accent2:rgba(124,110,245,.18);
+    --green:#34D399; --green2:rgba(52,211,153,.15);
+    --coral:#F87171;
+  }
+
   body {
     font-family: 'Plus Jakarta Sans', sans-serif !important;
-    background: #0c0f1a !important;
-    color: #f1f5f9;
+    background: var(--bg) !important;
+    color: var(--text);
     min-height: 100vh;
     overflow-x: hidden;
   }
-
   #root { font-family: 'Plus Jakarta Sans', sans-serif; }
 
-  /* ── Animations ── */
-  @keyframes qv3-float {
-    0%, 100% { transform: translateY(0) rotate(-3deg); }
-    50%       { transform: translateY(-10px) rotate(3deg); }
-  }
-  @keyframes qv3-pulse {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50%       { opacity: 0.4; transform: scale(1.4); }
-  }
-  @keyframes qv3-spin {
-    to { transform: rotate(360deg); }
-  }
-  @keyframes qv3-fall {
-    0%   { transform: translateY(0) rotate(0deg); opacity: 1; }
-    100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
-  }
-  @keyframes qv3-slideUp {
-    from { opacity: 0; transform: translateY(20px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-  @keyframes qv3-blinker {
-    0%, 100% { opacity: 1; }
-    50%       { opacity: 0.3; }
-  }
+  @keyframes qv5-float   { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
+  @keyframes qv5-fadeUp  { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes qv5-shimmer { 0%{background-position:-200% center} 100%{background-position:200% center} }
+  @keyframes qv5-spin    { to{transform:rotate(360deg)} }
+  @keyframes qv5-popIn   { 0%{transform:scale(.85);opacity:0} 70%{transform:scale(1.05)} 100%{transform:scale(1);opacity:1} }
+  @keyframes qv5-pulse   { 0%,100%{transform:scale(1)} 50%{transform:scale(1.04)} }
+  @keyframes qv5-fall    { 0%{transform:translateY(0) rotate(0deg);opacity:1} 100%{transform:translateY(100vh) rotate(720deg);opacity:0} }
 
-  .qv3-float   { animation: qv3-float 3s ease-in-out infinite; }
-  .qv3-pulse   { animation: qv3-pulse 2s infinite; }
-  .qv3-spinner { animation: qv3-spin 0.7s linear infinite; }
-  .qv3-confetti-piece {
-    position: absolute; top: -10px;
-    animation: qv3-fall 3s ease-in forwards;
-  }
-  .qv3-anim-up { animation: qv3-slideUp 0.4s ease both; }
-  .qv3-d1 { animation-delay: 0.1s; }
-  .qv3-d2 { animation-delay: 0.2s; }
-  .qv3-d3 { animation-delay: 0.3s; }
-  .qv3-d4 { animation-delay: 0.4s; }
-  .qv3-d5 { animation-delay: 0.5s; }
-  .qv3-d6 { animation-delay: 0.6s; }
-  .qv3-blink { animation: qv3-blinker 1s ease-in-out infinite; }
+  .qv5-float   { animation: qv5-float 3s ease-in-out infinite; }
+  .qv5-fadeUp  { animation: qv5-fadeUp .45s ease both; }
+  .qv5-popin   { animation: qv5-popIn .5s ease both; }
+  .qv5-pulse   { animation: qv5-pulse 1.5s ease infinite; }
+  .qv5-spinner { animation: qv5-spin 2s linear infinite; }
+  .qv5-confetti-piece { position:absolute; top:-10px; animation:qv5-fall 3s ease-in forwards; }
 
-  /* ── Quiz option ── */
-  .qv3-option {
+  /* Option buttons */
+  .qv5-opt {
     all: unset;
     box-sizing: border-box !important;
     display: flex !important;
     align-items: center !important;
-    gap: 12px !important;
-    padding: 14px 16px !important;
-    border-radius: 12px !important;
-    border: 2px solid #2a3055 !important;
-    background: #1a1f35 !important;
+    gap: 16px !important;
+    background: var(--card) !important;
+    border: 2px solid var(--border) !important;
+    border-radius: 18px !important;
+    padding: 16px 20px !important;
     cursor: pointer !important;
-    transition: all 0.2s !important;
+    transition: .22s !important;
     text-align: left !important;
+    font-family: 'Plus Jakarta Sans', sans-serif !important;
     width: 100% !important;
-    font-family: 'Plus Jakarta Sans', sans-serif !important;
-    line-height: 1.35 !important;
   }
-  .qv3-option:hover    { border-color: #818cf8 !important; background: #222845 !important; }
-  .qv3-option.qv3-sel  {
-    border-color: #818cf8 !important;
-    background: rgba(99,102,241,0.12) !important;
-    box-shadow: 0 0 0 3px rgba(99,102,241,0.1) !important;
-  }
+  .qv5-opt:hover { border-color:var(--border2) !important; background:var(--bg3) !important; transform:translateX(4px) !important; }
+  .qv5-opt.chosen { border-color:var(--gold) !important; background:var(--gold3) !important; }
+  .qv5-opt.chosen .qv5-opt-icon { background:var(--gold) !important; color:#0D0F1A !important; }
+  .qv5-opt-icon { width:44px; height:44px; border-radius:14px; background:var(--bg3); display:flex; align-items:center; justify-content:center; font-size:20px; flex-shrink:0; transition:.2s; }
+  .qv5-opt-check { width:22px; height:22px; border-radius:50%; border:2px solid var(--border2); flex-shrink:0; display:flex; align-items:center; justify-content:center; transition:.2s; font-size:12px; }
+  .qv5-opt.chosen .qv5-opt-check { background:var(--gold) !important; border-color:var(--gold) !important; color:#0D0F1A !important; }
 
-  /* ── Btn back ── */
-  .qv3-btn-back {
-    all: unset;
-    box-sizing: border-box !important;
-    padding: 10px 20px !important;
-    border-radius: 8px !important;
-    border: 2px solid #2a3055 !important;
-    background: transparent !important;
-    color: #64748b !important;
-    font-family: 'Plus Jakarta Sans', sans-serif !important;
-    font-size: 0.85rem !important;
-    font-weight: 600 !important;
-    cursor: pointer !important;
-    transition: all 0.2s !important;
-    display: inline-block !important;
-  }
-  .qv3-btn-back:hover { border-color: #64748b !important; color: #cbd5e1 !important; }
-
-  /* ── Btn next ── */
-  .qv3-btn-next {
-    all: unset;
-    box-sizing: border-box !important;
-    padding: 10px 28px !important;
-    border-radius: 8px !important;
-    background: #4f46e5 !important;
-    color: #fff !important;
-    font-family: 'Plus Jakarta Sans', sans-serif !important;
-    font-size: 0.85rem !important;
-    font-weight: 700 !important;
-    cursor: pointer !important;
-    transition: all 0.2s !important;
-    display: inline-block !important;
-    text-align: center !important;
-  }
-  .qv3-btn-next:hover   { background: #6366f1 !important; }
-  .qv3-btn-next.qv3-dim {
-    opacity: 0.3 !important;
-    pointer-events: none !important;
-    cursor: not-allowed !important;
-  }
-
-  /* ── Form input ── */
-  .qv3-input {
+  /* Capture inputs */
+  .qv5-input {
     all: unset;
     box-sizing: border-box !important;
     display: block !important;
     width: 100% !important;
-    padding: 11px 14px !important;
-    border-radius: 8px !important;
-    border: 2px solid #2a3055 !important;
-    background: #131729 !important;
+    background: var(--card) !important;
+    border: 1.5px solid var(--border2) !important;
+    border-radius: 14px !important;
+    padding: 14px 18px !important;
+    font-size: 15px !important;
     font-family: 'Plus Jakarta Sans', sans-serif !important;
-    font-size: 0.88rem !important;
-    color: #f1f5f9 !important;
-    transition: border-color 0.2s !important;
-    line-height: 1.5 !important;
+    color: var(--text) !important;
+    transition: .2s !important;
   }
-  .qv3-input:focus       { border-color: #818cf8 !important; }
-  .qv3-input::placeholder { color: #64748b !important; }
+  .qv5-input::placeholder { color: var(--muted2) !important; }
+  .qv5-input:focus { border-color:var(--gold) !important; background:var(--bg3) !important; outline:none !important; }
 
-  /* ── Submit button ── */
-  .qv3-btn-submit {
+  /* Select */
+  .qv5-select {
     all: unset;
     box-sizing: border-box !important;
     display: block !important;
     width: 100% !important;
-    padding: 14px !important;
-    border-radius: 12px !important;
-    background: linear-gradient(135deg, #4f46e5, #6366f1) !important;
-    color: #fff !important;
+    background: var(--card) !important;
+    border: 1.5px solid var(--border2) !important;
+    border-radius: 14px !important;
+    padding: 14px 44px 14px 18px !important;
+    font-size: 15px !important;
     font-family: 'Plus Jakarta Sans', sans-serif !important;
-    font-size: 0.95rem !important;
-    font-weight: 800 !important;
+    color: var(--text) !important;
+    transition: .2s !important;
+    appearance: none !important;
+    -webkit-appearance: none !important;
     cursor: pointer !important;
-    margin-top: 0.5rem !important;
-    transition: all 0.3s !important;
-    box-shadow: 0 4px 16px rgba(99,102,241,0.3) !important;
-    text-align: center !important;
-    line-height: 1.5 !important;
   }
-  .qv3-btn-submit:hover { transform: translateY(-1px) !important; }
+  .qv5-select:focus { border-color:var(--gold) !important; background:var(--bg3) !important; outline:none !important; }
+  .qv5-select.empty { color: var(--muted2) !important; }
 
-  /* ── Landing start button ── */
-  .qv3-btn-start {
-    all: unset;
-    box-sizing: border-box !important;
-    padding: 16px 48px !important;
-    border-radius: 12px !important;
-    background: linear-gradient(135deg, #4f46e5, #6366f1) !important;
-    color: #fff !important;
-    font-family: 'Plus Jakarta Sans', sans-serif !important;
-    font-size: 1.05rem !important;
-    font-weight: 800 !important;
-    cursor: pointer !important;
-    transition: all 0.3s !important;
-    box-shadow: 0 4px 20px rgba(99,102,241,0.4) !important;
-    display: inline-block !important;
-    text-align: center !important;
-    line-height: 1.5 !important;
-  }
-  .qv3-btn-start:hover {
-    transform: translateY(-2px) !important;
-    box-shadow: 0 8px 30px rgba(99,102,241,0.5) !important;
-  }
+  /* Karier tag */
+  .qv5-karier-tag { font-size:12px; font-weight:500; padding:5px 12px; border-radius:20px; background:rgba(245,200,66,.1); color:var(--gold); border:1px solid rgba(245,200,66,.2); }
 
-  /* ── Result card ── */
-  .qv3-res-card {
-    background: #1a1f35;
-    border: 1.5px solid #2a3055;
-    border-radius: 16px;
-    overflow: hidden;
-    transition: all 0.3s;
-  }
-  .qv3-res-card.qv3-top {
-    border-color: #818cf8;
-    box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
-  }
-  .qv3-res-body {
-    max-height: 0;
-    overflow: hidden;
-    transition: max-height 0.5s ease;
-  }
-  .qv3-res-card.qv3-open .qv3-res-body { max-height: 1200px; }
-  .qv3-chevron { transition: transform 0.25s; color: #64748b; font-size: 0.7rem; }
-  .qv3-res-card.qv3-open .qv3-chevron { transform: rotate(180deg); }
+  /* Progress fill */
+  .qv5-prog-fill { height:100%; border-radius:4px; background:linear-gradient(90deg,var(--accent),var(--gold)); transition:width .5s cubic-bezier(.4,0,.2,1); }
 
-  /* ── Match ring ── */
-  .qv3-ring-fg {
-    fill: none;
-    stroke: #818cf8;
-    stroke-width: 3;
-    stroke-linecap: round;
-    transition: stroke-dashoffset 1s ease;
-  }
-  .qv3-ring-bg { fill: none; stroke: #2a3055; stroke-width: 3; }
+  /* Other card */
+  .qv5-other-card { background:var(--card); border:1.5px solid var(--border); border-radius:18px; padding:18px; transition:.2s; cursor:pointer; }
+  .qv5-other-card:hover { border-color:var(--border2); transform:translateY(-2px); }
 
-  /* ── Trait tag ── */
-  .qv3-trait {
-    padding: 3px 10px;
-    border-radius: 100px;
-    font-size: 0.62rem;
-    font-weight: 700;
-    background: rgba(99,102,241,0.1);
-    color: #818cf8;
-    border: 1px solid rgba(99,102,241,0.2);
-  }
-
-  /* ── CTA buttons result ── */
-  .qv3-btn-cta-primary {
-    all: unset;
-    box-sizing: border-box !important;
-    display: block !important;
-    width: 100% !important;
-    padding: 14px !important;
-    border-radius: 12px !important;
-    background: linear-gradient(135deg, #10b981, #059669) !important;
-    color: #fff !important;
-    font-family: 'Plus Jakarta Sans', sans-serif !important;
-    font-size: 0.92rem !important;
-    font-weight: 800 !important;
-    cursor: pointer !important;
-    transition: all 0.2s !important;
-    text-align: center !important;
-    box-shadow: 0 4px 16px rgba(16,185,129,0.3) !important;
-    line-height: 1.5 !important;
-  }
-  .qv3-btn-cta-primary:hover { transform: translateY(-1px) !important; }
-
-  .qv3-btn-cta-secondary {
-    all: unset;
-    box-sizing: border-box !important;
-    display: block !important;
-    width: 100% !important;
-    padding: 14px !important;
-    border-radius: 12px !important;
-    border: 2px solid #818cf8 !important;
-    background: transparent !important;
-    color: #818cf8 !important;
-    font-family: 'Plus Jakarta Sans', sans-serif !important;
-    font-size: 0.92rem !important;
-    font-weight: 800 !important;
-    cursor: pointer !important;
-    transition: all 0.2s !important;
-    text-align: center !important;
-    line-height: 1.5 !important;
-  }
-  .qv3-btn-cta-secondary:hover { background: rgba(99,102,241,0.08) !important; }
-
-  .qv3-btn-share {
-    all: unset;
-    box-sizing: border-box !important;
-    display: block !important;
-    width: 100% !important;
-    padding: 11px !important;
-    border-radius: 8px !important;
-    border: 2px solid #2a3055 !important;
-    background: transparent !important;
-    color: #64748b !important;
-    font-family: 'Plus Jakarta Sans', sans-serif !important;
-    font-size: 0.8rem !important;
-    font-weight: 600 !important;
-    cursor: pointer !important;
-    margin-top: 0.3rem !important;
-    transition: all 0.2s !important;
-    text-align: center !important;
-    line-height: 1.5 !important;
-  }
-  .qv3-btn-share:hover { border-color: #64748b !important; color: #cbd5e1 !important; }
-
-  /* ── Momentum timeline ── */
-  .qv3-mt-row { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 8px; background: #131729; border: 1px solid transparent; transition: all 0.2s; }
-  .qv3-mt-row.active   { border-color: rgba(16,185,129,0.2); background: rgba(16,185,129,0.05); }
-  .qv3-mt-row.upcoming { opacity: 0.7; }
-  .qv3-mt-row.ended    { opacity: 0.4; }
-  .qv3-mt-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-  .qv3-mt-dot.active   { background: #34d399; box-shadow: 0 0 6px rgba(16,185,129,0.5); }
-  .qv3-mt-dot.upcoming { background: #818cf8; }
-  .qv3-mt-dot.ended    { background: #64748b; }
-
-  /* ── Quota fill ── */
-  .qv3-quota-fill      { height: 100%; border-radius: 100px; transition: width 1.5s ease; background: linear-gradient(90deg, #fbbf24, #fb923c); }
-  .qv3-quota-fill.low  { background: linear-gradient(90deg, #fb7185, #f43f5e); }
-
-  /* ── feat icon ── */
-  .qv3-feat-ic {
-    width: 22px; height: 22px; border-radius: 6px; background: #222845;
-    display: flex; align-items: center; justify-content: center; font-size: 0.6rem; flex-shrink: 0;
-  }
-
-  /* ── Prodi info sections (belajar / karier / cocok) ── */
-  .qv3-prodi-info { margin-bottom: 1rem; }
-  .qv3-prodi-info-section { margin-bottom: 10px; }
-  .qv3-prodi-info-label {
-    font-size: 0.6rem !important;
-    font-weight: 800 !important;
-    text-transform: uppercase !important;
-    letter-spacing: 0.08em !important;
-    margin-bottom: 5px !important;
-    display: flex !important;
-    align-items: center !important;
-    gap: 5px !important;
-    line-height: 1.4 !important;
-  }
-  .qv3-prodi-info-label span { font-size: 0.75rem !important; line-height: 1 !important; }
-  .qv3-label-belajar { color: #22d3ee !important; }
-  .qv3-label-karier  { color: #34d399 !important; }
-  .qv3-label-cocok   { color: #fbbf24 !important; }
-  .qv3-prodi-info-list {
-    display: flex !important;
-    flex-wrap: wrap !important;
-    gap: 4px !important;
-    align-items: flex-start !important;
-  }
-  .qv3-info-chip {
-    all: unset !important;
-    box-sizing: border-box !important;
-    display: inline-block !important;
-    padding: 4px 10px !important;
-    border-radius: 100px !important;
-    font-size: 0.6rem !important;
-    font-weight: 600 !important;
-    background: #131729 !important;
-    color: #cbd5e1 !important;
-    border: 1px solid #2a3055 !important;
-    line-height: 1.5 !important;
-    white-space: nowrap !important;
-  }
-  .qv3-cocok-text {
-    display: block !important;
-    font-size: 0.72rem !important;
-    color: #cbd5e1 !important;
-    line-height: 1.5 !important;
-    padding: 6px 10px !important;
-    background: #131729 !important;
-    border-radius: 8px !important;
-    border-left: 3px solid #fbbf24 !important;
-    font-style: italic !important;
-  }
-
-  @media (max-width: 380px) {
-    .qv3-q-text   { font-size: 1rem !important; }
-    .qv3-opt-txt  { font-size: 0.82rem !important; }
+  @media (max-width:380px) {
+    .qv5-opt { padding:12px 14px !important; }
   }
 `;
 
 // ============================================================
-// FORMATTER
+// FAC
 // ============================================================
-const fmt = n => (!n && n !== 0) ? '-' : 'Rp ' + Number(n).toLocaleString('id-ID');
-const fmtJt = n => n >= 1e6 ? (n / 1e6).toFixed(n % 1e6 ? 1 : 0) + ' jt' : fmt(n);
-
-// ============================================================
-// PRODI DATA
-// ============================================================
-const PD = {
-  teknik_lingkungan: { name: "Teknik Lingkungan", fak: "Fakultas Teknik", desc: "Pelajari solusi permasalahan lingkungan, pengelolaan limbah, air bersih, dan pembangunan berkelanjutan.", traits: ["Peduli Lingkungan", "Problem Solver", "Saintifik"], belajar: ["Analisis Dampak Lingkungan (AMDAL)", "Pengelolaan Limbah & Air Bersih", "Teknologi Pengendalian Pencemaran", "Perencanaan Lingkungan Berkelanjutan"], karier: ["Konsultan Lingkungan", "Analis AMDAL", "Environmental Engineer di Industri", "Peneliti Lingkungan"], cocok: "Kamu yang peduli isu lingkungan dan ingin berkontribusi nyata untuk bumi yang lebih baik.", c1: 7481250, total: 87400000, dp: 937500, dpp: 4625000, rincian: [{ k: "DP", v: 937500 }, { k: "DPP", v: 4625000 }, { k: "DPPS", v: 568750 }, { k: "PKKMB", v: 1350000 }] },
-  teknik_mesin: { name: "Teknik Mesin", fak: "Fakultas Teknik", desc: "Dalami perancangan, manufaktur, dan teknologi mesin dari otomotif hingga robotika.", traits: ["Teknis", "Inovatif", "Hands-on"], belajar: ["Perancangan Mesin & CAD", "Termodinamika & Mekanika Fluida", "Teknik Manufaktur & Otomasi", "Material Engineering"], karier: ["Mechanical Engineer", "Quality Control Engineer", "Desainer Produk Industri", "Engineer di Otomotif & Manufaktur"], cocok: "Kamu yang suka bongkar-pasang, penasaran bagaimana mesin bekerja, dan ingin menciptakan sesuatu yang nyata.", c1: 7915625, total: 92875000, dp: 937500, dpp: 4875000, rincian: [{ k: "DP", v: 937500 }, { k: "DPP", v: 4875000 }, { k: "DPPS", v: 753125 }, { k: "PKKMB", v: 1350000 }] },
-  teknik_industri: { name: "Teknik Industri", fak: "Fakultas Teknik", desc: "Optimalkan sistem produksi, manajemen operasi, dan efisiensi industri.", traits: ["Analitis", "Sistematis", "Multidisiplin"], belajar: ["Manajemen Operasi & Rantai Pasok", "Ergonomi & Keselamatan Kerja", "Riset Operasi & Optimasi", "Pengendalian Kualitas"], karier: ["Industrial Engineer", "Supply Chain Manager", "Management Consultant", "Operations Analyst"], cocok: "Kamu yang suka menganalisis sistem, mencari cara lebih efisien, dan berpikir secara holistik.", c1: 7681250, total: 91000000, dp: 937500, dpp: 4875000, rincian: [{ k: "DP", v: 937500 }, { k: "DPP", v: 4875000 }, { k: "DPPS", v: 518750 }, { k: "PKKMB", v: 1350000 }] },
-  pwk: { name: "Perencanaan Wilayah dan Kota", fak: "Fakultas Teknik", desc: "Rancang tata ruang kota, perencanaan urban, dan pembangunan wilayah berkelanjutan.", traits: ["Visioner", "Spasial", "Kreatif"], belajar: ["Tata Ruang & Perencanaan Kota", "Sistem Informasi Geografis (GIS)", "Perancangan Kawasan & Lanskap", "Ekonomi Wilayah & Transportasi"], karier: ["Urban Planner", "Konsultan Tata Ruang", "Analis Kebijakan Kota", "Perencana Transportasi"], cocok: "Kamu yang suka melihat peta, membayangkan kota masa depan, dan peduli dengan ruang publik.", c1: 7593750, total: 88300000, dp: 937500, dpp: 4625000, rincian: [{ k: "DP", v: 937500 }, { k: "DPP", v: 4625000 }, { k: "DPPS", v: 681250 }, { k: "PKKMB", v: 1350000 }] },
-  teknologi_pangan: { name: "Teknologi Pangan", fak: "Fakultas Teknik", desc: "Eksplorasi inovasi pengolahan makanan, keamanan pangan, dan industri kuliner modern.", traits: ["Scientist", "Inovatif", "Detail"], belajar: ["Kimia & Mikrobiologi Pangan", "Teknologi Pengolahan Makanan", "Keamanan & Mutu Pangan", "Pengembangan Produk Baru"], karier: ["Food Technologist", "Quality Assurance di Industri Makanan", "R&D Produk Pangan", "Konsultan Keamanan Pangan"], cocok: "Kamu yang suka eksperimen di dapur, penasaran dengan komposisi makanan, dan ingin berinovasi di industri pangan.", c1: 8056250, total: 96000000, dp: 937500, dpp: 5125000, rincian: [{ k: "DP", v: 937500 }, { k: "DPP", v: 5125000 }, { k: "DPPS", v: 643750 }, { k: "PKKMB", v: 1350000 }] },
-  teknik_informatika: { name: "Teknik Informatika", fak: "Fakultas Teknik", desc: "Kuasai pemrograman, AI, dan teknologi digital untuk membangun solusi masa depan.", traits: ["Logis", "Tech-Savvy", "Problem Solver"], belajar: ["Pemrograman & Algoritma", "Artificial Intelligence & Machine Learning", "Basis Data & Cloud Computing", "Pengembangan Aplikasi Web & Mobile"], karier: ["Software Engineer", "Data Scientist", "Full-Stack Developer", "IT Consultant"], cocok: "Kamu yang suka ngoding, memecahkan puzzle logis, dan ingin membangun teknologi yang dipakai banyak orang.", c1: 7700000, total: 89150000, dp: 937500, dpp: 4625000, rincian: [{ k: "DP", v: 937500 }, { k: "DPP", v: 4625000 }, { k: "DPPS", v: 787500 }, { k: "PKKMB", v: 1350000 }] },
-  kedokteran: { name: "Kedokteran", fak: "Fakultas Kedokteran", desc: "Jadi dokter profesional yang siap melayani masyarakat dengan ilmu kedokteran terkini.", traits: ["Empati", "Dedikasi", "Saintifik"], belajar: ["Anatomi & Fisiologi Manusia", "Farmakologi & Patologi", "Ilmu Penyakit Dalam & Bedah", "Kedokteran Komunitas & Keluarga"], karier: ["Dokter Umum", "Dokter Spesialis", "Peneliti Biomedis", "Dokter Layanan Primer"], cocok: "Kamu yang punya empati tinggi, tekun belajar sains, dan bermimpi menjadi dokter yang menolong sesama.", c1: 165150000, total: 522150000, dp: 0, dpp: 27600000, isKedokteran: true, rincian: [{ k: "DP (50%)", v: 100000000 }, { k: "Infak Wajib (50%)", v: 50000000 }, { k: "DPP Sem 1 (50%)", v: 13800000 }, { k: "PKKMB", v: 1350000 }] },
-  akuntansi: { name: "Akuntansi", fak: "Fakultas Ekonomi dan Bisnis", desc: "Kuasai akuntansi, audit, dan keuangan — karier yang selalu dibutuhkan.", traits: ["Teliti", "Analitis", "Terstruktur"], belajar: ["Akuntansi Keuangan & Manajemen", "Auditing & Perpajakan", "Sistem Informasi Akuntansi", "Analisis Laporan Keuangan"], karier: ["Akuntan Publik", "Auditor Internal/Eksternal", "Tax Consultant", "Financial Analyst"], cocok: "Kamu yang teliti dengan angka, suka keteraturan, dan ingin karier yang stabil dan selalu dibutuhkan.", c1: 7537500, total: 88350000, dp: 1000000, dpp: 4687500, rincian: [{ k: "DP", v: 1000000 }, { k: "DPP", v: 4687500 }, { k: "DPPS", v: 500000 }, { k: "PKKMB", v: 1350000 }] },
-  ekonomi_pembangunan: { name: "Ekonomi Pembangunan", fak: "Fakultas Ekonomi dan Bisnis", desc: "Analisis ekonomi makro, kebijakan publik, dan strategi pembangunan nasional.", traits: ["Analitis", "Visioner", "Kritis"], belajar: ["Ekonomi Makro & Mikro", "Ekonomi Publik & Kebijakan Fiskal", "Statistik & Ekonometrika", "Perencanaan Pembangunan"], karier: ["Ekonom di Lembaga Pemerintah", "Analis Kebijakan Publik", "Peneliti Ekonomi", "Konsultan Pembangunan"], cocok: "Kamu yang suka berpikir besar tentang ekonomi negara, gemar menganalisis data, dan peduli isu kesejahteraan.", c1: 7537500, total: 88350000, dp: 1000000, dpp: 4687500, rincian: [{ k: "DP", v: 1000000 }, { k: "DPP", v: 4687500 }, { k: "DPPS", v: 500000 }, { k: "PKKMB", v: 1350000 }] },
-  manajemen: { name: "Manajemen", fak: "Fakultas Ekonomi dan Bisnis", desc: "Pelajari kepemimpinan, strategi bisnis, dan manajemen organisasi modern.", traits: ["Leader", "Strategis", "Komunikatif"], belajar: ["Manajemen Strategis & Organisasi", "Manajemen Pemasaran & Keuangan", "Manajemen SDM & Operasional", "Kewirausahaan & Bisnis Plan"], karier: ["Management Trainee", "Marketing Manager", "HR Manager", "Entrepreneur / Founder Startup"], cocok: "Kamu yang punya jiwa leadership, suka mengorganisir orang, dan bermimpi memimpin perusahaan atau bisnis sendiri.", c1: 7537500, total: 88350000, dp: 1000000, dpp: 4687500, rincian: [{ k: "DP", v: 1000000 }, { k: "DPP", v: 4687500 }, { k: "DPPS", v: 500000 }, { k: "PKKMB", v: 1350000 }] },
-  bisnis_digital: { name: "Bisnis Digital", fak: "Fakultas Ekonomi dan Bisnis", desc: "Gabungkan bisnis dan teknologi — e-commerce, digital marketing, dan startup.", traits: ["Entrepreneur", "Digital", "Adaptif"], belajar: ["Digital Marketing & SEO/SEM", "E-Commerce & Platform Bisnis", "Data Analytics untuk Bisnis", "UI/UX & Product Management"], karier: ["Digital Marketing Specialist", "E-Commerce Manager", "Growth Hacker / Startup Founder", "Product Manager"], cocok: "Kamu yang aktif di media sosial, tertarik jualan online, dan ingin membangun bisnis di era digital.", c1: 5150000, total: 53350000, dp: 800000, dpp: 2500000, rincian: [{ k: "DP", v: 800000 }, { k: "DPP", v: 2500000 }, { k: "DPPS", v: 500000 }, { k: "PKKMB", v: 1350000 }] },
-  hub_internasional: { name: "Ilmu Hubungan Internasional", fak: "FISIP", desc: "Pelajari diplomasi, politik global, dan hubungan antar negara.", traits: ["Global", "Diplomatis", "Analitis"], belajar: ["Politik Internasional & Diplomasi", "Hukum Internasional", "Ekonomi Politik Global", "Studi Kawasan & Keamanan"], karier: ["Diplomat / Staf Kementerian Luar Negeri", "Analis Politik Internasional", "Staf Organisasi Internasional (PBB, ASEAN)", "Jurnalis Internasional"], cocok: "Kamu yang suka mengikuti berita dunia, tertarik politik global, dan bermimpi bekerja di kancah internasional.", c1: 6838000, total: 77255000, dp: 875000, dpp: 4000000, rincian: [{ k: "DP", v: 875000 }, { k: "DPP", v: 4000000 }, { k: "DPPS", v: 613000 }, { k: "PKKMB", v: 1350000 }] },
-  kesejahteraan_sosial: { name: "Ilmu Kesejahteraan Sosial", fak: "FISIP", desc: "Bantu masyarakat mengatasi masalah sosial melalui pendekatan profesional.", traits: ["Empati", "Sosial", "Advokasi"], belajar: ["Metode Pekerjaan Sosial", "Kebijakan Sosial & Kesejahteraan", "Pemberdayaan Masyarakat", "Konseling & Rehabilitasi Sosial"], karier: ["Pekerja Sosial Profesional", "Staf CSR Perusahaan", "Konsultan NGO / Lembaga Sosial", "Analis Kebijakan Sosial"], cocok: "Kamu yang berempati tinggi, suka menolong orang lain, dan ingin membuat perubahan sosial yang nyata.", c1: 6391000, total: 69685000, dp: 875000, dpp: 3500000, rincian: [{ k: "DP", v: 875000 }, { k: "DPP", v: 3500000 }, { k: "DPPS", v: 666000 }, { k: "PKKMB", v: 1350000 }] },
-  administrasi_publik: { name: "Ilmu Administrasi Publik", fak: "FISIP", desc: "Pelajari tata kelola pemerintahan, kebijakan publik, dan pelayanan masyarakat.", traits: ["Analitis", "Publik", "Terstruktur"], belajar: ["Kebijakan Publik & Analisis Kebijakan", "Manajemen Pemerintahan & Birokrasi", "Keuangan Negara & Daerah", "E-Government & Inovasi Publik"], karier: ["PNS / ASN di Pemerintahan", "Analis Kebijakan Publik", "Konsultan Good Governance", "Staf Legislatif / DPR"], cocok: "Kamu yang tertarik cara kerja pemerintahan, ingin memperbaiki pelayanan publik, dan bercita-cita jadi abdi negara.", c1: 6950000, total: 78150000, dp: 875000, dpp: 4000000, rincian: [{ k: "DP", v: 875000 }, { k: "DPP", v: 4000000 }, { k: "DPPS", v: 725000 }, { k: "PKKMB", v: 1350000 }] },
-  ilmu_komunikasi: { name: "Ilmu Komunikasi", fak: "FISIP", desc: "Kuasai media, public relations, broadcasting, dan komunikasi digital.", traits: ["Komunikatif", "Kreatif", "Dinamis"], belajar: ["Jurnalistik & Media Digital", "Public Relations & Corporate Communication", "Broadcasting (TV, Radio, Podcast)", "Komunikasi Pemasaran & Branding"], karier: ["Content Creator / Social Media Manager", "PR Specialist", "Jurnalis / Reporter", "Brand Communication Manager"], cocok: "Kamu yang jago ngomong, suka bikin konten, dan tertarik dunia media serta public relations.", c1: 7218000, total: 80300000, dp: 875000, dpp: 4000000, rincian: [{ k: "DP", v: 875000 }, { k: "DPP", v: 4000000 }, { k: "DPPS", v: 993000 }, { k: "PKKMB", v: 1350000 }] },
-  administrasi_bisnis: { name: "Ilmu Administrasi Bisnis", fak: "FISIP", desc: "Kelola organisasi bisnis, SDM, dan operasional perusahaan secara profesional.", traits: ["Organizer", "Strategis", "Praktis"], belajar: ["Manajemen Bisnis & Organisasi", "Manajemen SDM & Perilaku Organisasi", "Administrasi Keuangan Bisnis", "Logistik & Manajemen Rantai Pasok"], karier: ["Business Administrator", "HR Officer / People Operations", "Office Manager", "Business Development Executive"], cocok: "Kamu yang rapi dan terorganisir, suka mengelola sesuatu, dan ingin menjadi profesional di dunia korporasi.", c1: 6376000, total: 69560000, dp: 875000, dpp: 3500000, rincian: [{ k: "DP", v: 875000 }, { k: "DPP", v: 3500000 }, { k: "DPPS", v: 651000 }, { k: "PKKMB", v: 1350000 }] },
-  ilmu_hukum: { name: "Ilmu Hukum", fak: "Fakultas Hukum", desc: "Dalami hukum pidana, perdata, bisnis, dan HAM untuk menjadi penegak keadilan.", traits: ["Kritis", "Analitis", "Argumentatif"], belajar: ["Hukum Pidana & Perdata", "Hukum Bisnis & Kontrak", "Hukum Tata Negara & HAM", "Hukum Internasional & Lingkungan"], karier: ["Advokat / Pengacara", "Jaksa / Hakim", "Legal Officer di Perusahaan", "Notaris / Konsultan Hukum"], cocok: "Kamu yang suka berdebat, berpikir kritis, dan punya rasa keadilan yang kuat.", c1: 9100000, total: 86350000, dp: 750000, dpp: 4250000, rincian: [{ k: "DP", v: 750000 }, { k: "DPP", v: 4250000 }, { k: "DPPS", v: 2750000 }, { k: "PKKMB", v: 1350000 }] },
-  pend_matematika: { name: "Pendidikan Matematika", fak: "FKIP", desc: "Jadi guru matematika profesional yang menginspirasi generasi penerus.", traits: ["Logis", "Sabar", "Educator"], belajar: ["Aljabar, Kalkulus & Geometri", "Statistika & Probabilitas", "Strategi Pembelajaran Matematika", "Pengembangan Media Pembelajaran"], karier: ["Guru Matematika SMP/SMA", "Dosen Pendidikan", "Pengembang Kurikulum", "Tutor & Content Creator Edukasi"], cocok: "Kamu yang jago matematika, sabar mengajar, dan ingin membantu siswa jatuh cinta pada angka.", c1: 3840500, total: 52704000, dp: 668000, dpp: 1793000, isFKIP: true, rincian: [{ k: "DP", v: 668000 }, { k: "DPP", v: 1793000 }, { k: "DPPS", v: 29500 }, { k: "PKKMB", v: 1350000 }] },
-  pend_biologi: { name: "Pendidikan Biologi", fak: "FKIP", desc: "Kuasai biologi dan pedagogi untuk menjadi guru biologi yang inovatif.", traits: ["Saintifik", "Educator", "Teliti"], belajar: ["Botani, Zoologi & Ekologi", "Genetika & Biologi Molekuler", "Metodologi Pembelajaran Sains", "Praktikum & Penelitian Biologi"], karier: ["Guru Biologi SMP/SMA", "Laboran / Asisten Peneliti", "Pengembang Media Pembelajaran Sains", "Edukator Lingkungan"], cocok: "Kamu yang penasaran dengan makhluk hidup, suka ke alam, dan ingin menginspirasi siswa lewat sains.", c1: 3983500, total: 54400000, dp: 668000, dpp: 1793000, isFKIP: true, rincian: [{ k: "DP", v: 668000 }, { k: "DPP", v: 1793000 }, { k: "DPPS", v: 172500 }, { k: "PKKMB", v: 1350000 }] },
-  pend_bahasa_indonesia: { name: "Pendidikan Bahasa dan Sastra Indonesia", fak: "FKIP", desc: "Jadi guru bahasa Indonesia yang membentuk kemampuan literasi bangsa.", traits: ["Literat", "Komunikatif", "Educator"], belajar: ["Linguistik & Tata Bahasa Indonesia", "Sastra Indonesia & Apresiasi Karya", "Metodologi Pengajaran Bahasa", "Penulisan Kreatif & Jurnalistik"], karier: ["Guru Bahasa Indonesia SMP/SMA", "Editor & Penulis Konten", "Jurnalis / Penulis Buku", "Content Writer & Copywriter"], cocok: "Kamu yang gemar membaca, suka menulis, dan ingin melestarikan bahasa Indonesia lewat pendidikan.", c1: 3861000, total: 52950000, dp: 668000, dpp: 1793000, isFKIP: true, rincian: [{ k: "DP", v: 668000 }, { k: "DPP", v: 1793000 }, { k: "DPPS", v: 50000 }, { k: "PKKMB", v: 1350000 }] },
-  pgsd: { name: "Pendidikan Guru Sekolah Dasar", fak: "FKIP", desc: "Bentuk fondasi pendidikan anak-anak Indonesia sebagai guru SD profesional.", traits: ["Sabar", "Kreatif", "Educator"], belajar: ["Psikologi Perkembangan Anak", "Pembelajaran Tematik & Kurikulum SD", "Seni & Kreativitas dalam Pendidikan", "Manajemen Kelas & Bimbingan Konseling"], karier: ["Guru SD Negeri/Swasta", "Konselor Pendidikan Anak", "Pengembang Kurikulum SD", "Pengelola Lembaga Pendidikan Anak"], cocok: "Kamu yang sabar, kreatif, suka anak-anak, dan ingin membentuk karakter generasi penerus sejak dini.", c1: 3817250, total: 52415000, dp: 668000, dpp: 1793000, isFKIP: true, rincian: [{ k: "DP", v: 668000 }, { k: "DPP", v: 1793000 }, { k: "DPPS", v: 6250 }, { k: "PKKMB", v: 1350000 }] },
-  ppkn: { name: "Pendidikan Pancasila dan Kewarganegaraan", fak: "FKIP", desc: "Tanamkan nilai Pancasila dan kewarganegaraan pada generasi muda.", traits: ["Nasionalis", "Educator", "Kritis"], belajar: ["Pendidikan Pancasila & Kewarganegaraan", "Hukum Tata Negara", "Etika & Filsafat Pendidikan", "Kajian Demokrasi & HAM"], karier: ["Guru PPKn SMP/SMA", "Penyuluh Hukum", "Pegawai KPU / Bawaslu", "Fasilitator Pendidikan Demokrasi"], cocok: "Kamu yang nasionalis, peduli demokrasi, dan ingin mendidik generasi penerus untuk mencintai bangsa.", c1: 3824500, total: 52502000, dp: 668000, dpp: 1793000, isFKIP: true, rincian: [{ k: "DP", v: 668000 }, { k: "DPP", v: 1793000 }, { k: "DPPS", v: 13500 }, { k: "PKKMB", v: 1350000 }] },
-  pend_ekonomi: { name: "Pendidikan Ekonomi", fak: "FKIP", desc: "Jadi guru ekonomi yang mampu menumbuhkan literasi finansial siswa.", traits: ["Analitis", "Educator", "Praktis"], belajar: ["Ilmu Ekonomi & Bisnis", "Akuntansi Dasar & Keuangan", "Strategi Pembelajaran Ekonomi", "Kewirausahaan & Literasi Finansial"], karier: ["Guru Ekonomi SMP/SMA", "Fasilitator Literasi Keuangan", "Pengembang Kurikulum Ekonomi", "Konsultan Pendidikan"], cocok: "Kamu yang paham ekonomi, suka mengajar, dan ingin menumbuhkan literasi finansial generasi muda.", c1: 3881750, total: 53185000, dp: 668000, dpp: 1793000, isFKIP: true, rincian: [{ k: "DP", v: 668000 }, { k: "DPP", v: 1793000 }, { k: "DPPS", v: 70750 }, { k: "PKKMB", v: 1350000 }] },
-  // seni_musik: { name: "Seni Musik", fak: "FISS", desc: "Kembangkan bakat musik — performance, komposisi, dan industri musik.", traits: ["Musikal", "Ekspresif", "Kreatif"], belajar: ["Teori Musik & Harmoni", "Komposisi & Aransemen", "Teknik Vokal & Instrumen", "Industri Musik & Manajemen Artis"], karier: ["Musisi / Performer", "Komposer & Arranger", "Guru Musik", "Music Director / Sound Engineer"], cocok: "Kamu yang hidup dalam melodi, bermimpi berkarya di industri musik, dan ingin berkarier dengan passion.", c1: 6350000, total: 69250000, dp: 0, dpp: 3450000, rincian: [{ k: "DPP", v: 3450000 }, { k: "DPPS", v: 1550000 }, { k: "PKKMB", v: 1350000 }] },
-  // dkv: { name: "Desain Komunikasi Visual", fak: "FISS", desc: "Ciptakan desain grafis, branding, dan komunikasi visual yang memukau.", traits: ["Visual Thinker", "Kreatif", "Tech-Savvy"], belajar: ["Desain Grafis & Tipografi", "Branding & Identitas Visual", "Ilustrasi Digital & Motion Graphics", "UI/UX Design"], karier: ["Graphic Designer", "Brand & Visual Identity Specialist", "UI/UX Designer", "Creative Director"], cocok: "Kamu yang punya mata artistik, suka bikin sesuatu yang indah secara visual, dan ingin karier di industri kreatif.", c1: 6900000, total: 78050000, dp: 0, dpp: 4000000, rincian: [{ k: "DPP", v: 4000000 }, { k: "DPPS", v: 1550000 }, { k: "PKKMB", v: 1350000 }] },
-  // sastra_inggris: { name: "Sastra Inggris", fak: "FISS", desc: "Kuasai bahasa Inggris, sastra, linguistik, dan buka peluang karier global.", traits: ["Literat", "Global", "Komunikatif"], belajar: ["Linguistik & Tata Bahasa Inggris", "Sastra Inggris & Amerika", "Penerjemahan & Interpretasi", "Komunikasi Bisnis Internasional"], karier: ["Penerjemah / Interpreter", "Guru Bahasa Inggris", "Content Writer Internasional", "Diplomat / Staf Kedubes"], cocok: "Kamu yang fasih berbahasa Inggris, suka sastra, dan ingin karier yang membuka pintu ke dunia internasional.", c1: 6350000, total: 69850000, dp: 0, dpp: 3500000, rincian: [{ k: "DPP", v: 3500000 }, { k: "DPPS", v: 1500000 }, { k: "PKKMB", v: 1350000 }] },
-  // fotografi: { name: "Fotografi", fak: "FISS", desc: "Abadikan momen dan ceritakan kisah melalui seni fotografi profesional.", traits: ["Visual", "Kreatif", "Storyteller"], belajar: ["Teknik Fotografi & Komposisi", "Foto Jurnalistik & Dokumenter", "Editing & Post-Processing Digital", "Manajemen Studio & Bisnis Foto"], karier: ["Fotografer Profesional / Komersial", "Foto Jurnalis", "Content Photographer (Brand & Social Media)", "Art Director"], cocok: "Kamu yang punya kepekaan visual tinggi, suka bercerita lewat gambar, dan ingin passion jadi profesi.", c1: 6775000, total: 76050000, dp: 0, dpp: 3875000, rincian: [{ k: "DPP", v: 3875000 }, { k: "DPPS", v: 1550000 }, { k: "PKKMB", v: 1350000 }] },
-  seni_musik: { name: "Seni Musik", fak: "FISS", desc: "Kembangkan bakat musik — performance, komposisi, dan industri musik.", traits: ["Musikal", "Ekspresif", "Kreatif"], belajar: ["Teori Musik & Harmoni", "Komposisi & Aransemen", "Teknik Vokal & Instrumen", "Industri Musik & Manajemen Artis"], karier: ["Musisi / Performer", "Komposer & Arranger", "Guru Musik", "Music Director / Sound Engineer"], cocok: "Kamu yang hidup dalam melodi, bermimpi berkarya di industri musik, dan ingin berkarier dengan passion.", c1: 7975000, total: 69250000, dp: 1625000, dpp: 3450000, rincian: [{ k: "DP", v: 1625000 }, { k: "DPP", v: 3450000 }, { k: "DPPS", v: 1550000 }, { k: "PKKMB", v: 1350000 }] },
-  dkv: { name: "Desain Komunikasi Visual", fak: "FISS", desc: "Ciptakan desain grafis, branding, dan komunikasi visual yang memukau.", traits: ["Visual Thinker", "Kreatif", "Tech-Savvy"], belajar: ["Desain Grafis & Tipografi", "Branding & Identitas Visual", "Ilustrasi Digital & Motion Graphics", "UI/UX Design"], karier: ["Graphic Designer", "Brand & Visual Identity Specialist", "UI/UX Designer", "Creative Director"], cocok: "Kamu yang punya mata artistik, suka bikin sesuatu yang indah secara visual, dan ingin karier di industri kreatif.", c1: 8525000, total: 78050000, dp: 1625000, dpp: 4000000, rincian: [{ k: "DP", v: 1625000 }, { k: "DPP", v: 4000000 }, { k: "DPPS", v: 1550000 }, { k: "PKKMB", v: 1350000 }] },
-  sastra_inggris: { name: "Sastra Inggris", fak: "FISS", desc: "Kuasai bahasa Inggris, sastra, linguistik, dan buka peluang karier global.", traits: ["Literat", "Global", "Komunikatif"], belajar: ["Linguistik & Tata Bahasa Inggris", "Sastra Inggris & Amerika", "Penerjemahan & Interpretasi", "Komunikasi Bisnis Internasional"], karier: ["Penerjemah / Interpreter", "Guru Bahasa Inggris", "Content Writer Internasional", "Diplomat / Staf Kedubes"], cocok: "Kamu yang fasih berbahasa Inggris, suka sastra, dan ingin karier yang membuka pintu ke dunia internasional.", c1: 7975000, total: 69850000, dp: 1625000, dpp: 3500000, rincian: [{ k: "DP", v: 1625000 }, { k: "DPP", v: 3500000 }, { k: "DPPS", v: 1500000 }, { k: "PKKMB", v: 1350000 }] },
-  fotografi: { name: "Fotografi", fak: "FISS", desc: "Abadikan momen dan ceritakan kisah melalui seni fotografi profesional.", traits: ["Visual", "Kreatif", "Storyteller"], belajar: ["Teknik Fotografi & Komposisi", "Foto Jurnalistik & Dokumenter", "Editing & Post-Processing Digital", "Manajemen Studio & Bisnis Foto"], karier: ["Fotografer Profesional / Komersial", "Foto Jurnalis", "Content Photographer (Brand & Social Media)", "Art Director"], cocok: "Kamu yang punya kepekaan visual tinggi, suka bercerita lewat gambar, dan ingin passion jadi profesi.", c1: 8400000, total: 76050000, dp: 1625000, dpp: 3875000, rincian: [{ k: "DP", v: 1625000 }, { k: "DPP", v: 3875000 }, { k: "DPPS", v: 1550000 }, { k: "PKKMB", v: 1350000 }] },
-}
-const KOMP_HELP = {
-  'DP': 'Biaya pengembangan sarana & prasarana kampus',
-  'DPP': 'Biaya pokok perkuliahan — nominal per cicilan',
-  'DPPS': 'Biaya lab, peralatan & fasilitas belajar',
-  'PKKMB': 'Orientasi mahasiswa baru (satu kali bayar)',
-  'DP (50%)': 'Biaya pengembangan kampus (tahap 1)',
-  'DPP Sem 1 (50%)': 'Biaya pokok perkuliahan semester 1 (tahap 1)',
-  'Infak Wajib (50%)': 'Sumbangan wajib masuk Fakultas Kedokteran',
+const FAC = {
+  feb:   { name:'Fak. Ekonomi & Bisnis',             color:'#38BDF8', short:'FEB' },
+  fisip: { name:'Fak. Ilmu Sosial & Ilmu Politik',   color:'#A78BFA', short:'FISIP' },
+  ft:    { name:'Fak. Teknik',                       color:'#34D399', short:'F.Teknik' },
+  fkip:  { name:'Fak. Keguruan & Ilmu Pendidikan',  color:'#FB923C', short:'FKIP' },
+  fiss:  { name:'Fak. Ilmu Seni & Sastra',           color:'#F472B6', short:'FISS' },
+  hukum: { name:'Fak. Hukum',                       color:'#60A5FA', short:'F.Hukum' },
+  fk:    { name:'Fak. Kedokteran',                  color:'#F87171', short:'F.Kedokteran' },
 };
 
 // ============================================================
-// MOMENTUM CONFIG
+// BIAYA & SOCIAL PROOF
 // ============================================================
-const MOMENTUM = [
-  { id: "pra-snbp", name: "Pra-SNBP", period: "5 Jan – 25 Mar 2026", start: "2026-01-05", end: "2026-03-25", dpCut: 2000000, quota: 200, voucher: 300, jalur: "PMDK" },
-  { id: "pasca-snbp", name: "Pasca-SNBP", period: "31 Mar – 30 Apr 2026", start: "2026-03-31", end: "2026-04-30", dpCut: 1500000, quota: 100, voucher: 300, jalur: "PMDK" },
-  { id: "pasca-snbt", name: "Pasca-SNBT", period: "25 Mei – 4 Jun 2026", start: "2026-05-25", end: "2026-06-04", dpCut: 1000000, quota: 100, voucher: 200, jalur: "PMDK / USM" },
+const BIAYA = {
+  manajemen:'Rp 7,54 jt', admbisnis:'Rp 6,38 jt', akuntansi:'Rp 7,54 jt',
+  ekopem:'Rp 7,54 jt', bisdig:'Rp 5,15 jt', admpublik:'Rp 6,95 jt',
+  kessos:'Rp 6,39 jt', ilkom:'Rp 7,22 jt', hi:'Rp 6,84 jt',
+  tekind:'Rp 7,68 jt', tekinfo:'Rp 7,70 jt', tekmesin:'Rp 7,92 jt',
+  tekpangan:'Rp 8,06 jt', teklngk:'Rp 7,48 jt', pwk:'Rp 7,59 jt',
+  pendmat:'Rp 3,82 jt', pendbio:'Rp 3,90 jt', pendeko:'Rp 3,85 jt',
+  pendbindo:'Rp 3,98 jt', pendppkn:'Rp 3,82 jt', pgsd:'Rp 3,88 jt',
+  dkv:'Rp 6,90 jt', fotografi:'Rp 6,78 jt', senimus:'Rp 6,35 jt',
+  sasinggris:'Rp 6,35 jt', hukum:'Rp 9,10 jt', kedokteran:'Rp 165 jt',
+};
+
+const SOCIAL = {
+  manajemen:  '👥 1.200+ mahasiswa aktif · ⭐ Prodi terpopuler di FEB',
+  admbisnis:  '👥 480+ mahasiswa aktif · ⭐ Akreditasi Unggul',
+  akuntansi:  '👥 890+ mahasiswa aktif · 🏆 #1 pilihan karier finance',
+  ekopem:     '👥 320+ mahasiswa aktif · 🌐 Buka karier di BAPPEDA & lembaga internasional',
+  bisdig:     '⚡ Prodi terbaru FEB · 📈 Kurikulum paling relevan 2025',
+  admpublik:  '👥 550+ mahasiswa aktif · 🏛️ Akreditasi Unggul FISIP',
+  kessos:     '💛 Satu-satunya prodi Kessos di Bandung barat · Akreditasi Unggul',
+  ilkom:      '👥 720+ mahasiswa aktif · 📱 Alumni di media nasional',
+  hi:         '🌐 Pintu menuju karier internasional · Akreditasi Unggul',
+  tekind:     '⚙️ Prodi teknik dengan prospek manajemen · Akreditasi Unggul',
+  tekinfo:    '💻 Demand tertinggi di industri · Alumni di startup unicorn',
+  tekmesin:   '🔧 Fondasi industri manufaktur · Akreditasi Unggul',
+  tekpangan:  '🌱 Industri F&B Indonesia tumbuh 12%/tahun · Akreditasi Unggul',
+  teklngk:    '🌿 Makin relevan di era ESG · Akreditasi Unggul',
+  pwk:        '🏙️ Prodi lintas teknik-sosial yang unik · Akreditasi Unggul',
+  pendmat:    '📚 PPPK guru terus dibuka · Akreditasi Unggul',
+  pendbio:    '🧬 Karier ganda: guru + industri kesehatan',
+  pendeko:    '📊 Trainer korporat makin dicari · Akreditasi Unggul',
+  pendbindo:  '✍️ Era content economy butuh penulis berkualitas',
+  pendppkn:   '🇮🇩 Karier di sekolah + lembaga pemerintahan',
+  pgsd:       '📚 Formasi PPPK guru SD selalu besar tiap tahun',
+  dkv:        '🎨 UI/UX designer — gaji tertinggi fresh grad kreatif',
+  fotografi:  '📸 Industri konten visual tumbuh 40%/tahun',
+  senimus:    '🎵 Lebih dari 5 jalur monetisasi di era streaming',
+  sasinggris: '🌍 English proficiency = pembuka semua pintu karier',
+  hukum:      '⚖️ Pengacara & notaris — profesi bergengsi dan berkelanjutan',
+  kedokteran: '🩺 Dokter selalu dibutuhkan — investasi karier terkuat',
+};
+
+// ============================================================
+// PRODI (27 prodi, v5 structure, 5 titles corrected)
+// ============================================================
+const PRODI = [
+  { id:'manajemen',  fac:'feb',   title:'Manajemen',                              emoji:'📊', desc:'Belajar cara ngelola bisnis dari A-Z — SDM, keuangan, strategi, sampai marketing. Prodi paling fleksibel buat yang mau jadi bos.',                                              karier:['Manajer Bisnis','Entrepreneur','Brand Manager','Konsultan'],                   irisan:['admbisnis','akuntansi','bisdig','tekind'],   tags:['bisnis','leadership','strategi'],  why:{ galau:'Manajemen kasih kamu fondasi luas — kamu nggak perlu tau spesifik dulu, prodi ini justru bantu kamu explore.', excited:'Kalau kamu excited soal bisnis dan ngelola orang, ini tempatnya.', pressure:'Ini pilihan "aman" yang orang tua biasanya setuju, tapi juga beneran menarik.', ready:'Konfirmasi yang tepat — prospeknya luas dan relevan banget.' },                          scores:{ bisnis:5,sosial:2,sains:1,seni:0,publik:1,teknik:1 } },
+  { id:'admbisnis',  fac:'fisip', title:'Ilmu Administrasi Bisnis',               emoji:'🗂️', desc:'Ngerti cara kerja sistem dan organisasi bisnis dari dalam. Cocok buat yang suka "behind the scenes"-nya sebuah perusahaan.',                                                    karier:['HRD Manager','Corporate Affairs','Ops Manager','Konsultan Org.'],             irisan:['manajemen','admpublik','bisdig'],            tags:['organisasi','sistem','HRD'],       why:{ galau:'Adm. Bisnis itu luas tapi terarah — fokus ke sistem, bukan angka doang.', excited:'Kalau kamu excited soal "gimana sih perusahaan bisa jalan?", ini jawabannya.', pressure:'Prodi sosial yang tetap bisnis-oriented — jembatan yang oke antara dua dunia.', ready:'Solid choice kalau kamu udah tau mau kerja di sektor korporat.' },                     scores:{ bisnis:4,sosial:3,sains:0,seni:0,publik:2,teknik:0 } },
+  { id:'akuntansi',  fac:'feb',   title:'Akuntansi',                              emoji:'💰', desc:'Nguasain bahasa keuangan bisnis. Dari laporan rugi-laba sampai audit — semua bisnis butuh orang akuntansi.',                                                                    karier:['Akuntan Publik','Auditor','Financial Controller','Tax Consultant'],            irisan:['manajemen','ekopem'],               tags:['keuangan','angka','audit'],        why:{ galau:'Akuntansi itu punya jalur karier yang jelas banget — kalau kamu butuh kepastian, ini bisa tenangkan.', excited:'Kalau angka bikin kamu excited, ini tempat kamu.', pressure:'Profesi akuntan itu bergengsi dan bikin orang tua proud.', ready:'Kalau udah yakin mau di bidang keuangan, ini pilihan terkuat.' },                                                scores:{ bisnis:4,sosial:0,sains:3,seni:0,publik:1,teknik:1 } },
+  { id:'ekopem',     fac:'feb',   title:'Ekonomi Pembangunan',                    emoji:'📈', desc:'Analisis ekonomi di level makro — kebijakan negara, investasi wilayah, dan pembangunan. Cocok buat yang suka mikir skala besar.',                                              karier:['Peneliti Ekonomi','Analis Kebijakan','Perencana Pembangunan','Staf BAPPEDA'], irisan:['admpublik','akuntansi'],            tags:['makro','kebijakan','riset'],       why:{ galau:'Kalau kamu sering nanya "kenapa ekonomi Indonesia kayak gini?", kamu udah di track yang bener.', excited:'Prodi yang cocok buat pemikir besar dengan curiosity tinggi.', pressure:'Karier di pemerintahan dan lembaga internasional — prestisius dan stabil.', ready:'Pilihan untuk yang mau dampak luas di skala kebijakan.' },                               scores:{ bisnis:2,sosial:3,sains:3,seni:0,publik:4,teknik:0 } },
+  { id:'bisdig',     fac:'feb',   title:'Bisnis Digital',                         emoji:'⚡', desc:'Jalanin bisnis di era digital — e-commerce, digital marketing, growth hacking. Prodi paling relevan buat Gen Z yang mau jadi game changer.',                                  karier:['Digital Strategist','Product Manager','Growth Hacker','E-commerce Mgr'],      irisan:['manajemen','admbisnis','ilkom'],     tags:['digital','tech','marketing'],     why:{ galau:'Bisnis Digital itu exciting dan fresh — buat kamu yang ngerasa prodi lain terlalu "jadul".', excited:'Kalau kamu excited soal dunia digital dan bisnis, ini literally dibuat buat kamu.', pressure:'Prodi modern yang bisa jadi solusi kompromi antara passion digital dan ekspektasi orang tua.', ready:'For the ones who just know they wanna be in the digital space.' },   scores:{ bisnis:5,sosial:1,sains:2,seni:1,publik:0,teknik:2 } },
+  { id:'admpublik',  fac:'fisip', title:'Ilmu Administrasi Publik',               emoji:'🏛️', desc:'Ngerti cara kerja pemerintahan dan lembaga publik. Karier di ASN, BUMN, atau NGO — buat kamu yang mau memberi dampak untuk negeri.',                                          karier:['PNS/ASN','Analis Kebijakan','Manajer BUMN','Staf NGO'],                       irisan:['admbisnis','ekopem','hi'],          tags:['pemerintahan','kebijakan','publik'], why:{ galau:'Kalau kamu bingung tapi ngerasa "mau yang berguna buat orang banyak", ini sangat cocok.', excited:'Buat yang excited soal politik, governance, dan perubahan sosial.', pressure:'Karier PNS = stabilitas jangka panjang yang biasanya diidamkan keluarga.', ready:'Kalau udah tau mau di sektor publik, ini fondasinya.' },                                   scores:{ bisnis:1,sosial:4,sains:0,seni:0,publik:5,teknik:0 } },
+  { id:'kessos',     fac:'fisip', title:'Ilmu Kesejahteraan Sosial',              emoji:'🤝', desc:'Jadi pekerja sosial profesional yang bantu individu dan komunitas. Karier di pemerintahan, NGO, dan lembaga sosial internasional.',                                            karier:['Pekerja Sosial','Konselor Sosial','Staf NGO','Community Dev.'],               irisan:['admpublik','ilkom'],                tags:['sosial','komunitas','empati'],     why:{ galau:'Kalau kamu ngerasa "gue cuma mau bantu orang", Kessos legitimizes dan professionalize itu.', excited:'Prodi buat yang genuinely peduli sama isu sosial dan mau jadi agen perubahan.', pressure:'Karier di KEMENSOS dan lembaga internasional sangat nyata.', ready:'Bold choice yang meaningful banget.' },                                                        scores:{ bisnis:0,sosial:5,sains:0,seni:0,publik:5,teknik:0 } },
+  { id:'ilkom',      fac:'fisip', title:'Ilmu Komunikasi',                        emoji:'🗣️', desc:'Strategi komunikasi, PR, content creation, dan media. Di era sekarang, skill komunikasi = superpower yang dibutuhkan semua industri.',                                         karier:['Public Relations','Brand Strategist','Jurnalis','Content Creator'],           irisan:['bisdig','manajemen','sasinggris'],  tags:['media','PR','storytelling'],      why:{ galau:'Komunikasi itu foundational — semua karier butuh skill ini. Kalau masih bingung, ini safety net yang keren.', excited:'Buat yang suka nulis, ngomong, bikin konten — ini rumahmu.', pressure:'Industri kreatif + komunikasi makin dibutuhkan, banyak yang belum ngerti potensinya.', ready:'Kalau udah tau mau di media atau brand — gas.' },                         scores:{ bisnis:3,sosial:4,sains:0,seni:3,publik:2,teknik:0 } },
+  { id:'hi',         fac:'fisip', title:'Ilmu Hubungan Internasional',            emoji:'🌏', desc:'Diplomasi, politik global, dan kerjasama internasional. Buat yang punya mimpi besar dan mau main di panggung dunia.',                                                          karier:['Diplomat','Staf Kemlu','Analis Geopolitik','Staf UN/ASEAN'],                  irisan:['admpublik','ilkom','hukum'],         tags:['global','diplomasi','politik'],   why:{ galau:'HI kasih kamu perspektif global yang bikin masalah lokal jadi lebih makes sense.', excited:'Kalau berita internasional itu exciting buat kamu, kamu udah terpanggil.', pressure:'Karier diplomatik = prestisius banget. Ini bisa jadi argumen ke orang tua.', ready:'The dream for the globally-minded.' },                                                    scores:{ bisnis:1,sosial:5,sains:0,seni:0,publik:5,teknik:0 } },
+  { id:'tekind',     fac:'ft',    title:'Teknik Industri',                        emoji:'⚙️', desc:'Optimasi sistem produksi dan operasional. Jembatan antara teknik dan manajemen — lulusan yang paling diincar industri manufaktur.',                                            karier:['Industrial Engineer','Supply Chain Mgr','Ops Manager','Quality Engineer'],    irisan:['manajemen','tekinfo'],              tags:['optimasi','produksi','sistem'],   why:{ galau:'Kalau suka problem solving tapi belum tau mau ke bisnis atau teknik — TI adalah jawabannya.', excited:'Prodi buat yang excited soal efisiensi dan bikin sistem jalan mulus.', pressure:'Gelar teknik dengan skill manajemen = paling aman di pasar kerja.', ready:'Solid choice untuk industrialis.' },                                                           scores:{ bisnis:3,sosial:0,sains:4,seni:0,publik:0,teknik:5 } },
+  { id:'tekinfo',    fac:'ft',    title:'Teknik Informatika',                     emoji:'💻', desc:'Coding, AI, software engineering. Prodi dengan demand karier tertinggi di era digital — skill-nya relevan di seluruh industri.',                                               karier:['Software Engineer','Data Scientist','IT Consultant','CTO Startup'],           irisan:['bisdig','tekind'],                  tags:['coding','AI','software'],         why:{ galau:'Teknik Informatika = skill yang selalu dicari. Kalau bingung, ini yang paling "future-proof".', excited:'Kalau suka problem solving via coding, ini surga kamu.', pressure:'Gaji engineer tertinggi di Indonesia — argumen terkuat ke orang tua.', ready:'The ultimate move kalau mau jadi tech person.' },                                                  scores:{ bisnis:2,sosial:0,sains:5,seni:0,publik:0,teknik:5 } },
+  { id:'tekmesin',   fac:'ft',    title:'Teknik Mesin',                           emoji:'🔧', desc:'Perancangan dan manufaktur sistem mekanikal. Karier di industri otomotif, energi, dan manufaktur yang terus tumbuh.',                                                          karier:['Design Engineer','Maintenance Mgr','Prod. Engineer','R&D Engineer'],          irisan:['tekind','tekpangan'],               tags:['manufaktur','mesin','energi'],    why:{ galau:'Teknik Mesin = jalur karier yang sangat jelas dan konkret.', excited:'Buat yang suka bongkar-pasang dan ngerti cara kerja benda.', pressure:'Insinyur mesin = profesi yang dihormati dan bergaji tinggi.', ready:'Engineering track yang teruji waktu.' },                                                                                                     scores:{ bisnis:1,sosial:0,sains:5,seni:0,publik:0,teknik:5 } },
+  { id:'tekpangan',  fac:'ft',    title:'Teknologi Pangan',                       emoji:'🌱', desc:'Inovasi produk makanan-minuman dan keamanan pangan. Di balik setiap produk yang kamu makan, ada food technologist.',                                                           karier:['Food Scientist','QC Manager','R&D Pangan','Wirausaha Kuliner'],               irisan:['tekmesin','tekind'],                tags:['pangan','inovasi','industri'],    why:{ galau:'Unik dan niche — kalau suka kuliner tapi juga sains, ini rare combo yang worth it.', excited:'Industri F&B Indonesia tumbuh pesat — timing-nya perfect.', pressure:'Prospek industri makanan = stabil dan terus berkembang.', ready:'Solid untuk yang passionate di pangan.' },                                                                            scores:{ bisnis:2,sosial:0,sains:5,seni:0,publik:1,teknik:4 } },
+  { id:'teklngk',    fac:'ft',    title:'Teknik Lingkungan',                      emoji:'🌿', desc:'Teknologi untuk menyelamatkan planet — sanitasi, pengelolaan limbah, dan infrastruktur hijau. Makin relevan di era ESG.',                                                     karier:['Environmental Engineer','AMDAL Consultant','Green Infra','Staf KLHK'],        irisan:['tekmesin','pwk'],                   tags:['lingkungan','ESG','hijau'],       why:{ galau:'Kalau kamu peduli sama bumi tapi juga suka sains — ini rare dan powerful combo.', excited:'Prodi masa depan yang jawab isu climate change secara konkret.', pressure:'Regulasi ESG bikin demand engineer lingkungan meledak.', ready:'Impactful choice untuk era sustainability.' },                                                                         scores:{ bisnis:1,sosial:1,sains:5,seni:0,publik:3,teknik:4 } },
+  { id:'pwk',        fac:'ft',    title:'Perencanaan Wilayah dan Kota',           emoji:'🏙️', desc:'Mendesain masa depan kota — tata ruang, infrastruktur, dan pembangunan wilayah. Prodi lintas teknik-sosial yang paling unik.',                                                karier:['Urban Planner','Konsultan Tata Ruang','BAPPEDA','GIS Analyst'],               irisan:['teklngk','admpublik','ekopem'],      tags:['kota','tata ruang','GIS'],        why:{ galau:'PWK = prodi buat yang suka banyak hal dan nggak mau terjebak satu kotak.', excited:'Kalau kamu suka kota dan desain ruang, ini passion yang ternyata bisa jadi karier.', pressure:'Konsultan tata ruang pemerintah = karier strategis dan bergengsi.', ready:'Unique positioning yang jarang ada saingannya.' },                                             scores:{ bisnis:1,sosial:2,sains:3,seni:1,publik:4,teknik:3 } },
+  { id:'pendmat',    fac:'fkip',  title:'Pendidikan Matematika',                  emoji:'📐', desc:'Matematika sebagai ilmu dan seni mengajar. Karier guru + terbuka ke data analytics di era digital.',                                                                           karier:['Guru Matematika','Data Analyst','Peneliti','Math Tutor'],                     irisan:['pendeko','pgsd'],                   tags:['matematika','mengajar','data'],   why:{ galau:'Guru = salah satu karier paling stabil dan punya purpose jelas.', excited:'Kalau matematika itu fun buat kamu, kamu punya gift yang langka.', pressure:'Profesi guru = dihormati dan ada jaminan PPPK/ASN.', ready:'Teaching + analytical skills = combo yang kuat.' },                                                                                   scores:{ bisnis:1,sosial:1,sains:4,seni:0,publik:3,teknik:2 } },
+  { id:'pendbio',    fac:'fkip',  title:'Pendidikan Biologi',                     emoji:'🧬', desc:'Biologi dan pedagogi. Karier di sekolah, lab riset, atau industri kesehatan dan farmasi.',                                                                                     karier:['Guru Biologi','Lab Analyst','Peneliti','Penyuluh Kesehatan'],                 irisan:['pendmat','kedokteran'],             tags:['biologi','sains','mengajar'],     why:{ galau:'Jalur karier yang jelas dan impactful.', excited:'Buat yang fascinated sama kehidupan di level sel.', pressure:'Profesi guru + pembuka jalan ke kesehatan.', ready:'Strong choice untuk biology enthusiast.' },                                                                                                                                                scores:{ bisnis:0,sosial:1,sains:5,seni:0,publik:2,teknik:1 } },
+  { id:'pendeko',    fac:'fkip',  title:'Pendidikan Ekonomi',                     emoji:'📊', desc:'Konsep ekonomi-bisnis untuk dunia pendidikan. Guru ekonomi yang juga bisa jadi trainer korporat.',                                                                             karier:['Guru Ekonomi','Trainer Korporat','Edukator Keuangan','HRD Training'],         irisan:['ekopem','manajemen'],               tags:['ekonomi','pendidikan','bisnis'],  why:{ galau:'Kombinasi ekonomi dan pendidikan = jalur yang aman dan meaningful.', excited:'Kalau suka jelasin konsep ke orang lain, kamu natural teacher.', pressure:'Guru + trainer = karier yang dipandang positif.', ready:'Jembatan antara dunia bisnis dan pendidikan.' },                                                                                           scores:{ bisnis:2,sosial:3,sains:1,seni:0,publik:3,teknik:0 } },
+  { id:'pendbindo',  fac:'fkip',  title:'Pendidikan Bahasa dan Sastra Indonesia', emoji:'✍️', desc:'Linguistik, sastra, dan mengajar. Di era content economy, kemampuan menulis = aset berharga.',                                                                                karier:['Guru Bahasa Indonesia','Editor','Jurnalis','Content Writer'],                 irisan:['ilkom','sasinggris'],               tags:['bahasa','sastra','menulis'],      why:{ galau:'Kemampuan nulis yang bagus terbuka semua pintu karier.', excited:'Kalau suka menulis dan bercerita, ini rumahmu.', pressure:'Editor dan content writer sekarang banyak dicari industri digital.', ready:"The writer's path." },                                                                                                                              scores:{ bisnis:1,sosial:3,sains:0,seni:4,publik:2,teknik:0 } },
+  { id:'pendppkn',   fac:'fkip',  title:'Pendidikan Pancasila dan Kewarganegaraan', emoji:'🇮🇩', desc:'Pendidikan kewarganegaraan, HAM, dan demokrasi. Karier di sekolah dan lembaga pemerintahan.',                                                                              karier:['Guru PPKn','Staf Pemerintahan','Aktivis HAM','Peneliti Sosial'],              irisan:['kessos','admpublik'],               tags:['demokrasi','hukum','kewarganegaraan'], why:{ galau:'Kalau passionate soal keadilan dan hak asasi, ini jalur yang genuine.', excited:'Buat yang mau jadi suara perubahan dalam sistem.', pressure:'Karier di pemerintahan dan pendidikan = stabil.', ready:'Purpose-driven choice.' },                                                                                                                           scores:{ bisnis:0,sosial:5,sains:0,seni:0,publik:5,teknik:0 } },
+  { id:'pgsd',       fac:'fkip',  title:'Pendidikan Guru Sekolah Dasar',          emoji:'🎒', desc:'Guru SD yang siap mengajar semua mata pelajaran. Demand guru SD terus tumbuh seiring program pemerintah.',                                                                     karier:['Guru SD','Kepala Sekolah','Trainer Pendidikan','Peneliti Edukasi'],           irisan:['pendmat','pendbio'],                tags:['anak','guru SD','pendidikan dasar'], why:{ galau:'Karier guru SD = paling jelas dan stabil. Kalau bingung, ini bisa jadi anchor.', excited:'Kalau kamu suka sama anak-anak dan ngajar, ini pure passion.', pressure:'Formasi PPPK guru SD selalu besar tiap tahun.', ready:'Calling yang clear.' },                                                                                                              scores:{ bisnis:0,sosial:5,sains:1,seni:2,publik:4,teknik:0 } },
+  { id:'dkv',        fac:'fiss',  title:'Desain Komunikasi Visual',               emoji:'🎨', desc:'Desain grafis, branding, UI/UX, dan motion. Prodi seni paling dekat ke industri — portfolio-nya langsung jual.',                                                             karier:['Graphic Designer','UI/UX Designer','Brand Designer','Creative Director'],     irisan:['ilkom','bisdig','fotografi'],       tags:['desain','visual','branding'],     why:{ galau:'DKV itu tangible — karya kamu bisa langsung dilihat dan dijual.', excited:'Kalau visual language itu bahasa aslimu, ini tempat berkembang.', pressure:'Designer UI/UX sekarang gajinya bisa 2x gaji fresh grad jurusan lain.', ready:'Creative powerhouse track.' },                                                                                       scores:{ bisnis:3,sosial:1,sains:0,seni:5,publik:0,teknik:2 } },
+  { id:'fotografi',  fac:'fiss',  title:'Fotografi',                              emoji:'📸', desc:'Fotografi komersial, dokumenter, dan fine art. Di era konten, kemampuan visual storytelling makin bernilai.',                                                                  karier:['Fotografer Komersial','Photo Editor','Videografer','Content Creator'],        irisan:['dkv','ilkom'],                      tags:['visual','media','kreatif'],       why:{ galau:'Fotografi kasih kamu cara pandang baru — seringkali itu yang bikin galau-mu hilang.', excited:'Kalau kamu lihat dunia lewat lensa dan selalu mau capture momen, ini passion yang bisa jadi profesi.', pressure:'Fotografer komersial dan content creator bisa dapat income lebih dari karier konvensional.', ready:'Visual artist path.' },                     scores:{ bisnis:2,sosial:2,sains:0,seni:5,publik:1,teknik:1 } },
+  { id:'senimus',    fac:'fiss',  title:'Seni Musik',                             emoji:'🎵', desc:'Komposisi, pertunjukan, dan produksi musik. Di era streaming dan konten, musisi punya lebih banyak channel monetisasi.',                                                      karier:['Musisi','Komposer','Guru Musik','Music Producer'],                            irisan:['fotografi','dkv'],                  tags:['musik','seni','kreatif'],         why:{ galau:'Kalau musik itu satu-satunya hal yang bikin kamu hidup — dengerin instink itu.', excited:'Passion is real, career in music is more viable than ever.', pressure:'Music producer, music teacher, konten musik — banyak jalur yang sustainable.', ready:'Follow the music.' },                                                                                 scores:{ bisnis:1,sosial:3,sains:0,seni:5,publik:1,teknik:0 } },
+  { id:'sasinggris', fac:'fiss',  title:'Sastra Inggris',                         emoji:'🌍', desc:'Bahasa, sastra, dan linguistik Inggris. Kemampuan bahasa Inggris tinggi + pemahaman lintas budaya = aset berharga.',                                                          karier:['Penerjemah','Guru Bahasa Inggris','Content Writer','Tour Guide'],             irisan:['ilkom','hi','pendbindo'],           tags:['bahasa','internasional','sastra'], why:{ galau:'English proficiency membuka banyak pintu — kalau masih bingung, skill bahasa selalu berguna.', excited:'Buat yang genuinely suka literatur dan budaya Inggris.', pressure:'Translator dan interpreter dibutuhkan di banyak perusahaan multinasional.', ready:'Language is power.' },                                                                         scores:{ bisnis:2,sosial:4,sains:0,seni:3,publik:2,teknik:0 } },
+  { id:'hukum',      fac:'hukum', title:'Ilmu Hukum',                             emoji:'⚖️', desc:'Hukum perdata, pidana, bisnis, dan tata negara. Advokat, notaris, jaksa, atau legal officer — pilihan karier yang luas dan prestisius.',                                      karier:['Pengacara','Notaris','Jaksa/Hakim','Legal Officer'],                          irisan:['admpublik','hi','manajemen'],       tags:['hukum','regulasi','profesi'],     why:{ galau:'Hukum = profesi dengan jalur yang jelas. Kalau suka argumen dan debat, kamu natural lawyer.', excited:'Kalau baca berita hukum itu bikin kamu penasaran, instink itu bener.', pressure:'Pengacara, notaris, jaksa = profesi bergengsi yang orang tua pasti bangga.', ready:'The case rests.' },                                                                  scores:{ bisnis:2,sosial:3,sains:0,seni:0,publik:4,teknik:0 } },
+  { id:'kedokteran', fac:'fk',    title:'Kedokteran',                             emoji:'🩺', desc:'Ilmu kedokteran dan profesi dokter. Investasi besar, tapi karier paling mulia dan dibutuhkan sepanjang masa.',                                                                karier:['Dokter Umum','Dokter Spesialis','Peneliti Medis','Manajemen RS'],             irisan:['pendbio','teklngk'],                tags:['kesehatan','sains','profesi'],    why:{ galau:'Kalau dari kecil mau jadi dokter tapi ragu, galau-mu valid tapi instinknya jangan dikubur.', excited:'Medicine is a calling — kalau kamu excited soal tubuh manusia dan healing, ini jalan.', pressure:'Dokter = karier yang selalu diimpikan banyak keluarga.', ready:'The noblest path.' },                                                                    scores:{ bisnis:1,sosial:2,sains:5,seni:0,publik:3,teknik:4 } },
 ];
-const DPP_INCENTIVE = 1000000;
 
-function getMomentumStatus() {
-  const now = new Date();
-  return MOMENTUM.map(m => {
-    const s = new Date(m.start), e = new Date(m.end);
-    e.setHours(23, 59, 59);
-    let status = 'upcoming';
-    if (now >= s && now <= e) status = 'active';
-    else if (now > e) status = 'ended';
-    return { ...m, status };
-  });
-}
-
-function getActiveMomentum() {
-  return getMomentumStatus().find(m => m.status === 'active') || null;
-}
+const PRODI_MAP = Object.fromEntries(PRODI.map(p => [p.id, p]));
 
 // ============================================================
-// QUESTIONS
+// QUESTIONS (6, dimension-based)
 // ============================================================
 const QS = [
-  {
-    text: "Kalau weekend, aktivitas mana yang paling kamu nikmati?", hint: "Pilih yang paling menggambarkan dirimu", icon: "🌟", options: [
-      { text: "Ngulik coding, main game, atau explore gadget baru", icon: "💻", scores: { teknik_informatika: 3, bisnis_digital: 2, dkv: 1, teknik_industri: 1 } },
-      { text: "Nonton dokumenter, baca buku, atau diskusi isu sosial", icon: "📚", scores: { ilmu_hukum: 2, hub_internasional: 3, administrasi_publik: 2, ekonomi_pembangunan: 2, ppkn: 1 } },
-      { text: "Bikin konten, foto-foto, desain, atau main musik", icon: "🎨", scores: { dkv: 3, fotografi: 3, seni_musik: 3, ilmu_komunikasi: 2, pend_bahasa_indonesia: 1 } },
-      { text: "Olahraga, jalan-jalan alam, atau kegiatan sosial bareng komunitas", icon: "🌿", scores: { teknik_lingkungan: 2, kesejahteraan_sosial: 3, pgsd: 2, pend_biologi: 2, kedokteran: 1 } },
-    ]
-  },
-  {
-    text: "Di kelompok belajar, kamu biasanya berperan sebagai apa?", hint: "Peranmu menunjukkan kekuatan alami kamu", icon: "👥", options: [
-      { text: "Ketua yang ngatur strategi dan bagi tugas", icon: "👑", scores: { manajemen: 3, administrasi_bisnis: 2, administrasi_publik: 2, teknik_industri: 2 } },
-      { text: "Yang paling jago riset dan analisis data", icon: "🔍", scores: { akuntansi: 3, ekonomi_pembangunan: 2, teknik_industri: 2, ilmu_hukum: 2, pend_matematika: 2 } },
-      { text: "Yang bikin presentasinya jadi keren dan menarik", icon: "✨", scores: { dkv: 3, ilmu_komunikasi: 3, fotografi: 2, bisnis_digital: 1 } },
-      { text: "Yang sabar ngajarin teman yang belum paham", icon: "🤝", scores: { pgsd: 3, pend_matematika: 2, pend_biologi: 2, pend_bahasa_indonesia: 2, pend_ekonomi: 2, ppkn: 2, kesejahteraan_sosial: 2 } },
-    ]
-  },
-  {
-    text: "Mata pelajaran apa yang paling kamu suka di sekolah?", hint: "Nggak harus yang nilainya paling tinggi ya", icon: "📖", options: [
-      { text: "Matematika, Fisika, atau Kimia", icon: "🧮", scores: { teknik_mesin: 3, teknik_industri: 2, teknik_informatika: 2, teknik_lingkungan: 2, pend_matematika: 2, kedokteran: 2 } },
-      { text: "Bahasa Indonesia, Bahasa Inggris, atau Sejarah", icon: "📝", scores: { sastra_inggris: 3, pend_bahasa_indonesia: 3, ilmu_hukum: 2, hub_internasional: 2, ilmu_komunikasi: 1 } },
-      { text: "Ekonomi, Sosiologi, atau PKN", icon: "📊", scores: { manajemen: 2, ekonomi_pembangunan: 3, akuntansi: 2, administrasi_publik: 2, pend_ekonomi: 2, ppkn: 2, kesejahteraan_sosial: 1 } },
-      { text: "Seni Budaya, Prakarya, atau Biologi", icon: "🎭", scores: { seni_musik: 3, dkv: 2, fotografi: 2, pend_biologi: 3, teknologi_pangan: 2, pwk: 1 } },
-    ]
-  },
-  {
-    text: "Kamu lebih tertarik dengan karier yang kayak gimana?", hint: "Bayangkan 5-10 tahun ke depan", icon: "🚀", options: [
-      { text: "Jadi profesional di perusahaan besar atau bikin startup sendiri", icon: "🏢", scores: { manajemen: 3, bisnis_digital: 3, teknik_informatika: 2, administrasi_bisnis: 2, akuntansi: 2, teknik_industri: 2 } },
-      { text: "Berkontribusi untuk masyarakat — dokter, guru, pekerja sosial", icon: "❤️", scores: { kedokteran: 3, pgsd: 3, pend_matematika: 2, pend_biologi: 2, kesejahteraan_sosial: 3, pend_bahasa_indonesia: 2, ppkn: 2, pend_ekonomi: 2 } },
-      { text: "Berkarya di industri kreatif — media, desain, musik, fotografi", icon: "🎬", scores: { dkv: 3, fotografi: 3, seni_musik: 3, ilmu_komunikasi: 3, sastra_inggris: 1 } },
-      { text: "Bekerja di bidang hukum, pemerintahan, atau organisasi internasional", icon: "⚖️", scores: { ilmu_hukum: 3, hub_internasional: 3, administrasi_publik: 3, ekonomi_pembangunan: 2, ppkn: 1 } },
-    ]
-  },
-  {
-    text: "Kalau dikasih project bebas di sekolah, kamu bakal bikin apa?", hint: "Pilih yang bikin kamu paling excited", icon: "💡", options: [
-      { text: "Aplikasi atau website yang bisa bantu orang", icon: "📱", scores: { teknik_informatika: 3, bisnis_digital: 2, dkv: 2, teknik_industri: 1 } },
-      { text: "Video dokumenter atau kampanye sosial media", icon: "🎥", scores: { ilmu_komunikasi: 3, fotografi: 2, hub_internasional: 1, kesejahteraan_sosial: 2, dkv: 1 } },
-      { text: "Riset atau makalah tentang isu yang lagi trending", icon: "📋", scores: { ilmu_hukum: 2, ekonomi_pembangunan: 2, administrasi_publik: 2, teknik_lingkungan: 2, kedokteran: 2, pend_biologi: 1 } },
-      { text: "Produk kreatif — makanan unik, desain, musik, atau karya seni", icon: "🎨", scores: { teknologi_pangan: 3, seni_musik: 3, dkv: 2, fotografi: 2, pend_bahasa_indonesia: 1 } },
-    ]
-  },
-  {
-    text: "Isu global mana yang paling bikin kamu peduli?", hint: "Yang sering bikin kamu scroll lama di sosmed", icon: "🌍", options: [
-      { text: "Perubahan iklim, polusi, dan kelestarian lingkungan", icon: "🌱", scores: { teknik_lingkungan: 3, pwk: 2, pend_biologi: 2, teknologi_pangan: 1 } },
-      { text: "Kesenjangan sosial, kemiskinan, dan akses pendidikan", icon: "🤲", scores: { kesejahteraan_sosial: 3, pgsd: 2, administrasi_publik: 2, ekonomi_pembangunan: 2, ppkn: 2, pend_ekonomi: 2 } },
-      { text: "Perkembangan AI, teknologi, dan transformasi digital", icon: "🤖", scores: { teknik_informatika: 3, bisnis_digital: 3, teknik_industri: 2, teknik_mesin: 2 } },
-      { text: "Hak asasi manusia, demokrasi, dan hubungan antar negara", icon: "🕊️", scores: { ilmu_hukum: 3, hub_internasional: 3, ilmu_komunikasi: 1, administrasi_publik: 1 } },
-    ]
-  },
-  {
-    text: "Gaya belajar kamu lebih ke mana?", hint: "Cara kamu menyerap informasi paling efektif", icon: "🧠", options: [
-      { text: "Praktek langsung — learning by doing di lab atau lapangan", icon: "🔧", scores: { teknik_mesin: 3, teknik_lingkungan: 2, kedokteran: 3, teknologi_pangan: 2, teknik_informatika: 2, pend_biologi: 2 } },
-      { text: "Diskusi, debat, dan tukar pikiran sama orang lain", icon: "💬", scores: { ilmu_hukum: 3, hub_internasional: 2, ilmu_komunikasi: 2, manajemen: 2, pend_bahasa_indonesia: 2, pend_ekonomi: 1 } },
-      { text: "Visual — lewat gambar, diagram, video, atau peta", icon: "👁️", scores: { dkv: 3, fotografi: 3, pwk: 3, seni_musik: 1, pgsd: 1 } },
-      { text: "Analisis data, hitung-hitungan, dan problem solving", icon: "📐", scores: { akuntansi: 3, pend_matematika: 3, teknik_industri: 3, ekonomi_pembangunan: 2, administrasi_bisnis: 1 } },
-    ]
-  },
-  {
-    text: "Kamu lebih suka bekerja di lingkungan yang kayak gimana?", hint: "Suasana kerja ideal kamu", icon: "🏠", options: [
-      { text: "Kantor modern atau startup — cepat, dinamis, penuh tantangan", icon: "⚡", scores: { bisnis_digital: 3, teknik_informatika: 2, manajemen: 2, administrasi_bisnis: 2, ilmu_komunikasi: 2 } },
-      { text: "Rumah sakit, sekolah, atau lembaga sosial — meaningful work", icon: "🏥", scores: { kedokteran: 3, pgsd: 3, pend_matematika: 2, pend_biologi: 2, kesejahteraan_sosial: 3, ppkn: 2, pend_bahasa_indonesia: 2, pend_ekonomi: 2 } },
-      { text: "Studio kreatif, outdoor, atau freelance — bebas berekspresi", icon: "🎪", scores: { dkv: 3, fotografi: 3, seni_musik: 3, sastra_inggris: 2, pwk: 1, teknik_lingkungan: 1 } },
-      { text: "Instansi pemerintah, kantor hukum, atau organisasi internasional", icon: "🏛️", scores: { ilmu_hukum: 3, administrasi_publik: 3, hub_internasional: 3, ekonomi_pembangunan: 2, akuntansi: 1 } },
-    ]
-  },
-  {
-    text: "Skill apa yang paling pengen kamu kuasai?", hint: "Kemampuan yang bikin kamu pede di masa depan", icon: "⚔️", options: [
-      { text: "Coding, data analysis, atau digital marketing", icon: "🖥️", scores: { teknik_informatika: 3, bisnis_digital: 3, teknik_industri: 2, dkv: 1, akuntansi: 1 } },
-      { text: "Public speaking, negosiasi, dan leadership", icon: "🎤", scores: { manajemen: 3, ilmu_komunikasi: 2, hub_internasional: 2, administrasi_bisnis: 2, ilmu_hukum: 2, sastra_inggris: 1 } },
-      { text: "Desain, fotografi, videografi, atau musik", icon: "🎹", scores: { dkv: 3, fotografi: 3, seni_musik: 3, ilmu_komunikasi: 1 } },
-      { text: "Riset, menulis ilmiah, dan critical thinking", icon: "🔬", scores: { kedokteran: 2, teknik_lingkungan: 2, ekonomi_pembangunan: 2, pend_biologi: 2, pend_matematika: 2, ilmu_hukum: 2, teknologi_pangan: 2, pend_bahasa_indonesia: 2 } },
-    ]
-  },
-  {
-    text: "Terakhir! Motto hidup mana yang paling relate sama kamu?", hint: "Trust your gut! 🔥", icon: "🔥", options: [
-      { text: '"Teknologi adalah kunci masa depan"', icon: "🚀", scores: { teknik_informatika: 3, teknik_mesin: 2, bisnis_digital: 2, teknik_industri: 2, teknik_lingkungan: 1 } },
-      { text: '"Kreativitas tidak ada batasnya"', icon: "🌈", scores: { dkv: 3, fotografi: 3, seni_musik: 3, ilmu_komunikasi: 2, sastra_inggris: 1, pend_bahasa_indonesia: 1 } },
-      { text: '"Perubahan dimulai dari pendidikan dan keadilan"', icon: "✊", scores: { pgsd: 3, ilmu_hukum: 2, kesejahteraan_sosial: 2, pend_matematika: 2, pend_biologi: 2, ppkn: 2, administrasi_publik: 2, pend_ekonomi: 2, pend_bahasa_indonesia: 1 } },
-      { text: '"Sukses itu soal strategi dan eksekusi"', icon: "🎯", scores: { manajemen: 3, akuntansi: 2, ekonomi_pembangunan: 2, administrasi_bisnis: 2, hub_internasional: 1, kedokteran: 1 } },
-    ]
-  },
+  { context:'Tentang dirimu', q:'Kalau lagi free time, kamu paling sering ngapain?', hint:'Nggak ada jawaban salah — ini soal apa yang genuinely kamu nikmatin.', opts:[
+    { icon:'📱', main:'Scrolling konten, bikin video, atau nulis',  sub:'Content creation, storytelling, atau sekadar explore ide', scores:{ seni:3,sosial:2,bisnis:1 } },
+    { icon:'📢', main:'Ngitung, nge-data, atau problem solving',    sub:'Spreadsheet, puzzle, atau mikirin solusi dari masalah',    scores:{ sains:3,bisnis:2,teknik:1 } },
+    { icon:'🤗', main:'Nongkrong, ngobrol, atau bantu orang',       sub:'Seru-seruan bareng orang, dengerin cerita, atau jadi "pendengar yang baik"', scores:{ sosial:4,publik:2 } },
+    { icon:'🛠️', main:'Bikin atau oprek sesuatu',                   sub:'Ngerakit, desain, coding, masak, atau proyek DIY',        scores:{ teknik:4,sains:2,seni:2 } },
+  ]},
+  { context:'Cara kamu berpikir', q:'Waktu ada masalah besar, kamu lebih suka...', hint:'Ini ngecek cara kerja otak kamu — keduanya valid.', opts:[
+    { icon:'🗺️', main:'Mikir strategi & big picture',              sub:'Ngeliat masalah dari sudut pandang luas dan planning ke depan', scores:{ bisnis:3,sosial:2,publik:2 } },
+    { icon:'🔎', main:'Bedah detail sampai nemu root cause-nya',   sub:'Deep dive, riset, dan nggak puas sebelum ngerti sepenuhnya', scores:{ sains:3,teknik:3 } },
+    { icon:'💬', main:'Ngomong ke orang dan cari perspektif',      sub:'Brainstorm bareng, minta pendapat, dan cari konsensus',    scores:{ sosial:4,publik:2,seni:1 } },
+    { icon:'✏️', main:'Nulis, gambarin, atau visualisasiin',       sub:'Ide jadi lebih jelas kalau di-sketch atau ditulis',        scores:{ seni:4,sosial:1,bisnis:1 } },
+  ]},
+  { context:'Dunia kerja impian', q:'Gambaran karier yang bikin kamu semangat banget?', hint:'Pilih yang bikin kamu ngebayanginnya excited, bukan cuma "aman".', opts:[
+    { icon:'🏗️', main:'Bangun bisnis atau jadi pemimpin',          sub:'Entrepreneur, manajer, atau punya impact ke banyak orang lewat bisnis', scores:{ bisnis:5 } },
+    { icon:'🌏', main:'Kerja untuk masyarakat atau negara',        sub:'Pemerintahan, NGO, kebijakan publik, atau dampak sosial luas', scores:{ publik:4,sosial:3 } },
+    { icon:'🔬', main:'Jadi ahli teknis atau ilmuwan',             sub:'Engineer, researcher, dokter, atau spesialis yang diakui keahliannya', scores:{ sains:4,teknik:4 } },
+    { icon:'🎭', main:'Ekspresi diri & industri kreatif',          sub:'Desainer, seniman, komunikator, atau creator yang karyanya dikenal', scores:{ seni:5,bisnis:1 } },
+  ]},
+  { context:'Nilai yang kamu pegang', q:'Yang paling penting buat kamu dalam kerja?', hint:'Jawab yang paling authentic ke diri kamu.', opts:[
+    { icon:'💰', main:'Penghasilan & financial freedom',           sub:'Mau bisa hidup mandiri dan punya stability',                scores:{ bisnis:3,teknik:2,sains:2 } },
+    { icon:'❤️', main:'Dampak & meaningful work',                 sub:'Pekerjaan yang beneran bantu orang atau society',           scores:{ publik:4,sosial:3 } },
+    { icon:'🏆', main:'Prestise & diakui keahliannya',            sub:'Jadi expert yang dihormati di bidangnya',                   scores:{ sains:3,bisnis:2,publik:2 } },
+    { icon:'🎨', main:'Kebebasan & ekspresi',                     sub:'Bisa kreatif, punya otonomi, dan nggak stuck di rutinitas', scores:{ seni:4,bisnis:2 } },
+  ]},
+  { context:'Mata pelajaran', q:'Di SMA, mata pelajaran apa yang paling nggak berasa berat?', hint:'Bukan yang nilainya paling tinggi — tapi yang paling nggak kerasa kayak beban.', opts:[
+    { icon:'📊', main:'Matematika & Ekonomi',                      sub:'Angka, grafik, dan logika — it just clicks',               scores:{ sains:3,bisnis:3,teknik:2 } },
+    { icon:'📖', main:'IPS, Sejarah & Sosiologi',                  sub:'Ngerti kenapa dunia dan manusia berjalan kayak gini',      scores:{ sosial:4,publik:3 } },
+    { icon:'🧪', main:'Biologi, Kimia & Fisika',                   sub:'Science lab itu exciting, bukan scary',                   scores:{ sains:5,teknik:3 } },
+    { icon:'🎭', main:'Bahasa, Seni & Sastra',                     sub:'Ekspresiin diri lewat tulisan, visual, atau pertunjukan',  scores:{ seni:4,sosial:2 } },
+  ]},
+  { context:'Final check', q:'Jujur, apa kekhawatiran terbesar kamu soal kuliah?', hint:'Ini buat bantu kita kasih konteks yang tepat di hasil nanti.', opts:[
+    { icon:'😰', main:'Salah pilih dan nyesel',                    sub:'Takut buang waktu dan uang di jalur yang salah',           scores:{ bisnis:1,publik:1 } },
+    { icon:'💸', main:'Biaya dan prospek kerja',                   sub:'Mau yang ROI-nya jelas dan cepat kerja setelah lulus',     scores:{ bisnis:2,teknik:1,sains:1 } },
+    { icon:'😥', main:'Tekanan orang tua / lingkungan',            sub:'Pilihan gue vs ekspektasi mereka',                        scores:{ sosial:1,publik:1 } },
+    { icon:'🌟', main:'Nggak mau jadi biasa-biasa aja',            sub:'Mau menonjol dan beda dari yang lain',                    scores:{ seni:2,bisnis:2,teknik:1 } },
+  ]},
 ];
+
+// ============================================================
+// PERSONAS & FEELING
+// ============================================================
+const PERSONAS = {
+  bisnis: { emoji:'📊', label:'The Business Builder', desc:'Kamu punya instink bisnis yang kuat' },
+  sosial: { emoji:'🌱', label:'The Change Maker',     desc:'Kamu mau dampak nyata untuk orang banyak' },
+  sains:  { emoji:'🔬', label:'The Deep Thinker',     desc:'Kamu suka ngupas masalah sampai ke akarnya' },
+  seni:   { emoji:'🎨', label:'The Creative Soul',    desc:'Kamu ekspresi diri lewat karya' },
+  publik: { emoji:'🏛️', label:'The Public Servant',   desc:'Kamu tertarik jadi agen perubahan di sistem' },
+  teknik: { emoji:'⚙️', label:'The Problem Solver',   desc:'Kamu suka bikin sesuatu yang benar-benar kerja' },
+};
+
+const FEELING_RESPONSES = {
+  galau:    "Btw kita notice kamu lagi galau banget. It's okay — <b>galau soal prodi itu tanda kamu serius mikirin masa depan</b>. Kita bakal bantu kamu temukan titik terang dari jawaban-jawabanmu tadi.",
+  excited:  "Excited itu energi yang berharga! <b>Kita bakal bantu kamu channeling excitement itu ke prodi yang beneran match</b> sama siapa kamu sebenarnya.",
+  pressure: "Kita ngerti ada pressure dari luar. Tapi ingat: <b>prodi yang tepat itu yang cocok buat KAMU</b>, bukan buat siapa pun yang menekan.",
+  ready:    "Mantap kamu udah siap! <b>Kita tinggal konfirmasiin aja</b> apakah feeling kamu itu udah align sama karaktermu yang sebenarnya.",
+};
+
+const FEELING_MSGS = {
+  galau:    { confetti:'😵‍💫✨', greeting:'Galau-mu terjawab!',         title: t => `Berkenalan sama ${t}`,    sub:'Dari semua yang kamu jawab, ini prodi yang paling nyambung sama kamu sebenarnya.' },
+  excited:  { confetti:'🔥',    greeting:'Feeling-mu bener!',           title: t => `${t} — match!`,           sub:'Excitement kamu terarah. Ini prodi yang paling align sama energimu.' },
+  pressure: { confetti:'💪',    greeting:'Ini pilihanmu, bukan mereka.', title: t => `Kamu cocok di ${t}`,     sub:'Berdasarkan siapa kamu benerannya — bukan ekspektasi orang lain.' },
+  ready:    { confetti:'✅',    greeting:'Konfirmasi masuk!',            title: t => `${t} — cocok banget`,    sub:'Analisis kita align sama feeling kamu. Good instinct!' },
+  skip:     { confetti:'🎯',    greeting:'Ketemu nih!',                  title: () => 'Prodi terbaik buat kamu', sub:'Berdasarkan jawabanmu, ini yang paling cocok.' },
+};
+
+// ============================================================
+// SCORE CALCULATION
+// ============================================================
+function calcScores(dimScores) {
+  return PRODI.map(p => {
+    let s = 0;
+    Object.entries(dimScores).forEach(([k, v]) => { s += (p.scores[k] || 0) * v; });
+    const maxP = Object.values(p.scores).reduce((a, b) => a + b, 0) * 20;
+    const pct = Math.min(98, Math.max(30, Math.round((s / (maxP || 1)) * 100)));
+    return { ...p, pct };
+  }).sort((a, b) => b.pct - a.pct);
+}
 
 // ============================================================
 // PIXEL HELPERS
-// Mapping event sesuai tabel funnel PMB UNPAS:
-//   Landing page  → PageView        (auto via index.html / GTM)
-//   Mulai quiz    → QuizStarted     (custom)
-//   Selesai soal  → QuizCompleted   (custom)
-//   Submit data   → Lead ⭐         (standard — utama untuk optimasi Meta Ads)
-//   Lihat hasil   → ViewContent     (standard — data prodi #1, fak, biaya, top4)
-//   Klik Daftar   → InitiateCheckout(standard — content_name)
-//   Klik Chat WA  → Contact         (standard — prodi name)
 // ============================================================
 const pixelReady = () => typeof window.fbq === 'function';
-
-// EVENT: Mulai quiz — custom event QuizStarted
-// Trigger: klik tombol "Mulai Tes"
-function trackQuizStart() {
-  if (!pixelReady()) { console.warn('⚠️ Pixel QuizStarted: fbq not ready'); return; }
-  window.fbq('trackCustom', 'QuizStarted');
-  console.log('✅ Pixel: QuizStarted fired');
-}
-
-// EVENT: Selesai 10 soal — custom event QuizCompleted
-// Trigger: klik "Lanjut" di soal terakhir → masuk form capture
-function trackQuizCompleted() {
-  if (!pixelReady()) { console.warn('⚠️ Pixel QuizCompleted: fbq not ready'); return; }
-  window.fbq('trackCustom', 'QuizCompleted');
-  console.log('✅ Pixel: QuizCompleted fired');
-}
-
-// EVENT: Submit data — standard Lead ⭐ (main conversion)
-// Trigger: isi nama+WA lalu submit
-// Data: content_name, content_category
-function trackLead() {
-  if (!pixelReady()) { console.warn('⚠️ Pixel Lead: fbq not ready'); return; }
-  window.fbq('track', 'Lead', {
-    content_name: 'Quiz Kecocokan Prodi',
-    content_category: 'PMB UNPAS',
-  });
-  console.log('✅ Pixel: Lead fired');
-}
-
-// EVENT: Lihat hasil — standard ViewContent
-// Trigger: result page muncul
-// Data: prodi #1, fakultas, biaya, top 4 IDs
-function trackViewContent(top4) {
-  if (!pixelReady()) { console.warn('⚠️ Pixel ViewContent: fbq not ready'); return; }
-  const topKey = top4[0][0];
-  const topProdi = PD[topKey];
-  window.fbq('track', 'ViewContent', {
-    content_name: topProdi.name,
-    content_category: topProdi.fak,
-    content_ids: top4.map(([k]) => k),
-    contents: top4.map(([k]) => PD[k].name),
-    value: topProdi.c1,
-    currency: 'IDR',
-  });
-  console.log('✅ Pixel: ViewContent fired —', topProdi.name);
-}
-
-// EVENT: Klik daftar PMB — standard InitiateCheckout
-// Trigger: klik CTA daftar PMB
-// Data: content_name
-function trackInitiateCheckout() {
-  if (!pixelReady()) { console.warn('⚠️ Pixel InitiateCheckout: fbq not ready'); return; }
-  window.fbq('track', 'InitiateCheckout', {
-    content_name: 'Daftar PMB UNPAS',
-  });
-  console.log('✅ Pixel: InitiateCheckout fired');
-}
-
-// EVENT: Klik chat admisi WA — standard Contact
-// Trigger: klik tombol Chat Tim Admisi
-// Data: prodi name
-function trackContact(prodiName) {
-  if (!pixelReady()) { console.warn('⚠️ Pixel Contact: fbq not ready'); return; }
-  window.fbq('track', 'Contact', {
-    content_name: prodiName,
-  });
-  console.log('✅ Pixel: Contact fired —', prodiName);
-}
+function trackQuizStart()           { if (pixelReady()) window.fbq('trackCustom','QuizStarted'); }
+function trackQuizCompleted()       { if (pixelReady()) window.fbq('trackCustom','QuizCompleted'); }
+function trackLead()                { if (pixelReady()) window.fbq('track','Lead',{ content_name:'Quiz Kecocokan Prodi', content_category:'PMB UNPAS' }); }
+function trackViewContent(top)      { if (pixelReady()) window.fbq('track','ViewContent',{ content_name:top.title, content_category:FAC[top.fac]?.name||'', content_ids:[top.id], value:1, currency:'IDR' }); }
+function trackInitiateCheckout(n)   { if (pixelReady()) window.fbq('track','InitiateCheckout',{ content_name: n || 'Daftar PMB UNPAS' }); }
+function trackContact(n)            { if (pixelReady()) window.fbq('track','Contact',{ content_name: n }); }
 
 // ============================================================
 // CONFETTI
@@ -626,12 +318,12 @@ function Confetti({ active }) {
   useEffect(() => {
     if (!active || !ref.current) return;
     const el = ref.current;
-    const colors = ['#818cf8', '#22d3ee', '#34d399', '#fbbf24', '#fb7185', '#a78bfa'];
+    const colors = ['#F5C842','#7C6EF5','#34D399','#F87171','#FB923C','#F472B6'];
     const timers = [];
     for (let i = 0; i < 50; i++) {
       const t = setTimeout(() => {
         const c = document.createElement('div');
-        c.className = 'qv3-confetti-piece';
+        c.className = 'qv5-confetti-piece';
         Object.assign(c.style, {
           left: Math.random() * 100 + '%',
           backgroundColor: colors[Math.floor(Math.random() * colors.length)],
@@ -642,377 +334,51 @@ function Confetti({ active }) {
           animationDelay: Math.random() * 0.5 + 's',
         });
         el.appendChild(c);
-        setTimeout(() => c.remove(), 4000);
-      }, i * 50);
+        setTimeout(() => c.remove(), 4500);
+      }, i * 60);
       timers.push(t);
     }
     return () => timers.forEach(clearTimeout);
   }, [active]);
-  return <div ref={ref} style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 1000, overflow: 'hidden' }} />;
+  return <div ref={ref} style={{ position:'fixed',inset:0,pointerEvents:'none',zIndex:1000,overflow:'hidden' }} />;
+}
+
+// Animated match bar
+function MatchBar({ pct }) {
+  const [w, setW] = useState(0);
+  useEffect(() => { const t = setTimeout(() => setW(pct), 150); return () => clearTimeout(t); }, [pct]);
+  return <div style={{ height:'100%',borderRadius:4,background:'linear-gradient(90deg,#F5C842,#FF9F45)',transition:'width 1s ease',width:`${w}%` }} />;
 }
 
 // ============================================================
-// COUNTDOWN HOOK
-// ============================================================
-function useCountdown(active) {
-  const [cd, setCd] = useState({ d: '--', h: '--', m: '--', s: '--' });
-  // Gunakan primitive (id, end string) sebagai dep — bukan object active
-  // supaya tidak infinite loop karena object reference baru setiap render
-  const activeId = active?.id ?? null;
-  const activeEnd = active?.end ?? null;
-  useEffect(() => {
-    if (!activeEnd) return;
-    const end = new Date(activeEnd);
-    end.setHours(23, 59, 59, 999);
-    const tick = () => {
-      const diff = end - new Date();
-      if (diff <= 0) { setCd({ d: '00', h: '00', m: '00', s: '00' }); return; }
-      setCd({
-        d: String(Math.floor(diff / 86400000)).padStart(2, '0'),
-        h: String(Math.floor((diff % 86400000) / 3600000)).padStart(2, '0'),
-        m: String(Math.floor((diff % 3600000) / 60000)).padStart(2, '0'),
-        s: String(Math.floor((diff % 60000) / 1000)).padStart(2, '0'),
-      });
-    };
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [activeId, activeEnd]); // ✅ primitive deps — aman dari infinite loop
-  return cd;
-}
-
-// ============================================================
-// RESULT CARD COMPONENT
-// ============================================================
-function ProdiCard({ prodiKey, score, maxScore, rank, openIdx, setOpenIdx }) {
-  const d = PD[prodiKey];
-  const pct = Math.round((score / maxScore) * 100);
-  const circumference = Math.PI * 22;
-  const offset = circumference - (pct / 100) * circumference;
-  const isOpen = openIdx === rank;
-  const isTop = rank === 0;
-  const cicilanLabel = d.isFKIP ? '(cicilan 1 dari 3)' : d.isKedokteran ? '(cicilan 1, Gel.1)' : '(cicilan 1 dari 2)';
-  const rankLabels = ['#1', '#2', '#3', '#4'];
-
-  return (
-    <div
-      className={`qv3-res-card${isTop ? ' qv3-top' : ''}${isOpen ? ' qv3-open' : ''} qv3-anim-up qv3-d${rank + 1}`}
-    >
-      {/* Card header — clickable */}
-      <div
-        onClick={() => setOpenIdx(isOpen ? null : rank)}
-        style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}
-      >
-        {/* Rank badge */}
-        <div style={{
-          width: '26px', height: '26px', borderRadius: '7px', display: 'flex', alignItems: 'center',
-          justifyContent: 'center', fontSize: '0.6rem', fontWeight: 800, flexShrink: 0,
-          background: rank === 0 ? 'linear-gradient(135deg,#fbbf24,#f59e0b)' : '#222845',
-          color: rank === 0 ? '#451a03' : '#94a3b8',
-        }}>
-          {rankLabels[rank]}
-        </div>
-
-        {/* Prodi info */}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.name}</div>
-          <div style={{ fontSize: '0.62rem', color: '#64748b', fontWeight: 600, marginTop: '1px' }}>{d.fak}</div>
-        </div>
-
-        {/* Match percentage + ring */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-          <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#818cf8' }}>{pct}%</span>
-          <svg viewBox="0 0 28 28" width="28" height="28" style={{ transform: 'rotate(-90deg)' }}>
-            <circle className="qv3-ring-bg" cx="14" cy="14" r="11" />
-            <circle
-              className="qv3-ring-fg" cx="14" cy="14" r="11"
-              strokeDasharray={circumference}
-              strokeDashoffset={isOpen ? offset : circumference}
-              style={{ transition: 'stroke-dashoffset 1s ease' }}
-            />
-          </svg>
-        </div>
-
-        <span className="qv3-chevron">▼</span>
-      </div>
-
-      {/* Expandable body */}
-      <div className="qv3-res-body">
-        <div style={{ padding: '0 16px 16px' }}>
-          <p style={{ fontSize: '0.78rem', color: '#94a3b8', lineHeight: 1.6, marginBottom: '0.8rem' }}>{d.desc}</p>
-
-          {/* Traits */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '1rem' }}>
-            {(d.traits || []).map(t => <span key={t} className="qv3-trait">{t}</span>)}
-          </div>
-
-          {/* Prodi info: BELAJAR / KARIER / COCOK */}
-          <div className="qv3-prodi-info">
-            {/* KAMU AKAN BELAJAR */}
-            {d.belajar && d.belajar.length > 0 && (
-              <div className="qv3-prodi-info-section">
-                <div className="qv3-prodi-info-label qv3-label-belajar">
-                  <span>📚</span> KAMU AKAN BELAJAR
-                </div>
-                <div className="qv3-prodi-info-list">
-                  {d.belajar.map(b => <span key={b} className="qv3-info-chip">{b}</span>)}
-                </div>
-              </div>
-            )}
-            {/* PROSPEK KARIER */}
-            {d.karier && d.karier.length > 0 && (
-              <div className="qv3-prodi-info-section">
-                <div className="qv3-prodi-info-label qv3-label-karier">
-                  <span>💼</span> PROSPEK KARIER
-                </div>
-                <div className="qv3-prodi-info-list">
-                  {d.karier.map(k => <span key={k} className="qv3-info-chip">{k}</span>)}
-                </div>
-              </div>
-            )}
-            {/* COCOK UNTUK KAMU YANG */}
-            {d.cocok && (
-              <div className="qv3-prodi-info-section">
-                <div className="qv3-prodi-info-label qv3-label-cocok">
-                  <span>✨</span> COCOK UNTUK KAMU YANG
-                </div>
-                <div className="qv3-cocok-text">{d.cocok}</div>
-              </div>
-            )}
-          </div>
-
-          {/* Biaya box */}
-          <div style={{ background: '#131729', border: '1px solid #2a3055', borderRadius: '12px', padding: '12px 14px', marginBottom: '10px' }}>
-            <div style={{ fontSize: '0.58rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#10b981', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <span>💰</span> PREVIEW BIAYA KULIAH
-            </div>
-            <div style={{ fontSize: '1.3rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.5px' }}>{fmt(d.c1)}</div>
-            <div style={{ fontSize: '0.65rem', color: '#64748b', marginBottom: '0.8rem', lineHeight: 1.4 }}>{cicilanLabel} — bayar ini, langsung resmi jadi mahasiswa!</div>
-
-            <div style={{ borderTop: '1px solid #2a3055', paddingTop: '8px' }}>
-              {(d.rincian || []).map(r => (
-                <div key={r.k} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '4px 0', fontSize: '0.72rem', borderBottom: '1px solid rgba(42,48,85,0.4)' }}>
-                  <div style={{ color: '#94a3b8', fontWeight: 500 }}>
-                    {r.k}
-                    {KOMP_HELP[r.k] && <small style={{ display: 'block', fontSize: '0.56rem', color: '#64748b', fontWeight: 400, marginTop: '1px', lineHeight: 1.3 }}>{KOMP_HELP[r.k]}</small>}
-                  </div>
-                  <div style={{ fontWeight: 700, color: '#cbd5e1', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', marginLeft: '8px' }}>{fmt(r.v)}</div>
-                </div>
-              ))}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0 4px', fontSize: '0.72rem', borderTop: '2px solid #2a3055', marginTop: '4px' }}>
-                <div style={{ fontWeight: 800, color: '#f1f5f9' }}>Total Cicilan 1</div>
-                <div style={{ fontWeight: 900, color: '#34d399', fontVariantNumeric: 'tabular-nums' }}>{fmt(d.c1)}</div>
-              </div>
-            </div>
-
-            <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #2a3055', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ fontSize: '0.65rem', color: '#64748b' }}>Estimasi total s/d lulus: <strong style={{ color: '#cbd5e1', fontWeight: 800 }}>~{fmtJt(d.total)}</strong></div>
-              <a
-                target="_blank"
-                rel="noopener noreferrer"
-                href="https://pmb.unpas.ac.id/biaya/rincian-lengkap-v2/"
-                className="font-bold no-underline text-[0.65rem] text-[#818cf8]"
-              >
-                Detail →
-              </a>
-            </div>
-
-            {d.isKedokteran && (
-              <div style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)', borderRadius: '8px', padding: '8px 12px', fontSize: '0.65rem', color: '#fbbf24', fontWeight: 500, lineHeight: 1.4, marginTop: '8px' }}>
-                ⚠️ Biaya Kedokteran bervariasi per gelombang (angka di atas Gel.1). Belum termasuk Infak Kelipatan (min. kelipatan Rp 25 juta).
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ============================================================
-// PROMO SECTION COMPONENT
-// ============================================================
-function PromoSection({ topKey }) {
-  const d = PD[topKey];
-  // useMemo supaya momList & active tidak dibuat ulang setiap render
-  // (getMomentumStatus() mengembalikan array baru setiap dipanggil)
-  const momList = useMemo(() => getMomentumStatus(), []);
-  const active = useMemo(() => momList.find(m => m.status === 'active') || null, [momList]);
-  const isKedokteran = !!d.isKedokteran;
-  const bestDpCut = momList.reduce((max, m) => Math.max(max, m.dpCut), 0);
-  const maxSaving = bestDpCut + (isKedokteran ? 0 : DPP_INCENTIVE);
-
-  const cd = useCountdown(active);
-
-  // Quota animation — gunakan primitive deps, bukan object active
-  const activeId = active?.id ?? null;
-  const activeQuota = active?.quota ?? 0;
-  const activeStart = active?.start ?? null;
-  const activeEndQ = active?.end ?? null;
-  const [quotaPct, setQuotaPct] = useState(0);
-  const [quotaLeft, setQuotaLeft] = useState(activeQuota);
-  useEffect(() => {
-    if (!activeStart || !activeEndQ) return;
-    const start = new Date(activeStart), end = new Date(activeEndQ), now = new Date();
-    end.setHours(23, 59, 59);
-    const elapsed = (now - start) / (end - start);
-    const base = Math.min(0.85, elapsed * 0.9);
-    const filled = Math.min(0.92, Math.max(0.15, base + Math.random() * 0.05));
-    const remaining = activeQuota - Math.round(activeQuota * filled);
-    const t = setTimeout(() => { setQuotaPct(filled * 100); setQuotaLeft(remaining); }, 800);
-    return () => clearTimeout(t);
-  }, [activeId, activeStart, activeEndQ, activeQuota]); // ✅ primitive deps
-
-  return (
-    <div className="qv3-anim-up qv3-d5" style={{ marginBottom: '1.2rem' }}>
-      {/* Section title */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.72rem', fontWeight: 800, color: '#fbbf24', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.6rem' }}>
-        <span>🎁</span> POTONGAN & INSENTIF YANG BISA KAMU DAPATKAN
-      </div>
-
-      {/* Momentum DP card */}
-      <div style={{ background: '#1a1f35', border: '1.5px solid rgba(251,191,36,0.2)', borderRadius: '16px', overflow: 'hidden', position: 'relative' }}>
-        {/* Gold top stripe */}
-        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: 'linear-gradient(90deg,#fbbf24,#fb923c)' }} />
-
-        <div style={{ padding: '14px 16px 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px' }}>
-          <div style={{ flex: 1 }}>
-            <div style={{
-              display: 'inline-flex', alignItems: 'center', gap: '4px',
-              padding: '3px 10px', borderRadius: '100px', fontSize: '0.56rem', fontWeight: 800,
-              textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px',
-              background: active ? 'rgba(16,185,129,0.08)' : 'rgba(99,102,241,0.1)',
-              border: active ? '1px solid rgba(16,185,129,0.2)' : '1px solid rgba(99,102,241,0.2)',
-              color: active ? '#34d399' : '#818cf8',
-            }}>
-              {active ? '● Sedang Berlaku' : 'Segera Dibuka'}
-            </div>
-            <div style={{ fontSize: '0.92rem', fontWeight: 800, color: '#fff', marginBottom: '2px' }}>Potongan Dana Pembangunan (DP)</div>
-            <div style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: 500 }}>Daftar di waktu yang tepat, dapat potongan biaya DP</div>
-          </div>
-        </div>
-
-        {/* Countdown + quota (active only) */}
-        {active && (
-          <div style={{ padding: '0 16px' }}>
-            {/* Countdown */}
-            <div style={{ background: '#131729', border: '1px solid #2a3055', borderRadius: '8px', padding: '10px 12px', marginBottom: '8px' }}>
-              <div style={{ fontSize: '0.58rem', fontWeight: 700, color: '#fb7185', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <span className="qv3-blink" style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', background: '#fb7185' }} />
-                Periode {active.name} berakhir dalam
-              </div>
-              <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
-                {[['d', 'Hari'], ['h', 'Jam'], ['m', 'Menit'], ['s', 'Detik']].map(([k, label]) => (
-                  <div key={k} style={{ textAlign: 'center', background: '#222845', borderRadius: '6px', padding: '6px 10px', minWidth: '48px' }}>
-                    <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>{cd[k]}</div>
-                    <div style={{ fontSize: '0.5rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: '1px' }}>{label}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Quota bar */}
-            <div style={{ background: '#131729', border: '1px solid #2a3055', borderRadius: '8px', padding: '10px 12px', marginBottom: '8px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                <div style={{ fontSize: '0.62rem', fontWeight: 700, color: '#94a3b8' }}>Kuota potongan {active.name}</div>
-                <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#fbbf24' }}>{quotaLeft} / {active.quota} tersisa</div>
-              </div>
-              <div style={{ height: '6px', background: '#222845', borderRadius: '100px', overflow: 'hidden' }}>
-                <div className={`qv3-quota-fill${quotaPct > 70 ? ' low' : ''}`} style={{ width: `${quotaPct}%` }} />
-              </div>
-              {quotaPct > 50 && (
-                <div style={{ fontSize: '0.58rem', color: '#fb7185', fontWeight: 600, marginTop: '5px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <span>⚡</span> Kuota terbatas — siapa cepat, dia dapat!
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Momentum timeline */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', padding: '6px 16px 12px' }}>
-          {momList.map(m => (
-            <div key={m.id} className={`qv3-mt-row ${m.status}`}>
-              <div className={`qv3-mt-dot ${m.status}`} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#cbd5e1' }}>{m.name}</div>
-                <div style={{ fontSize: '0.58rem', color: '#64748b', fontWeight: 500 }}>{m.period} · {m.jalur} · Kuota {m.quota}</div>
-              </div>
-              <div style={{ fontSize: '0.72rem', fontWeight: 800, flexShrink: 0, color: m.status === 'active' ? '#34d399' : m.status === 'upcoming' ? '#818cf8' : '#64748b', textDecoration: m.status === 'ended' ? 'line-through' : 'none' }}>
-                {m.status === 'ended' ? fmt(m.dpCut) : '-' + fmt(m.dpCut)}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Note */}
-        <div style={{ padding: '0 16px 12px' }}>
-          <div style={{ fontSize: '0.62rem', color: '#64748b', lineHeight: 1.45, padding: '8px 10px', background: '#131729', borderRadius: '8px' }}>
-            <strong style={{ color: '#94a3b8' }}>Cara kerja:</strong> Potongan DP bukan potongan langsung di tagihan awal, melainkan penyesuaian biaya DP di semester berikutnya setelah kamu resmi aktif sebagai mahasiswa. Berlaku selama kuota tersedia.
-          </div>
-        </div>
-      </div>
-
-      {/* Insentif Pelunasan DPP (non-Kedokteran) */}
-      {!isKedokteran && (
-        <div style={{ background: '#1a1f35', border: '1.5px solid #2a3055', borderRadius: '16px', padding: '14px 16px', marginTop: '8px', position: 'relative', overflow: 'hidden' }}>
-          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: 'linear-gradient(90deg,#10b981,#22d3ee)' }} />
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-            <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#fff' }}>💎 Bonus Pelunasan DPP</div>
-            <div style={{ fontSize: '0.88rem', fontWeight: 900, color: '#34d399' }}>-{fmt(DPP_INCENTIVE)}</div>
-          </div>
-          <p style={{ fontSize: '0.68rem', color: '#94a3b8', lineHeight: 1.5, marginBottom: '8px' }}>
-            Lunasi DPP untuk 2 semester pertama sekaligus, dan dapatkan credit Rp 1 juta yang mengurangi tagihan DPP di Semester 3. Bisa digabung dengan beasiswa!
-          </p>
-          <div style={{ display: 'flex', gap: '6px', alignItems: 'stretch' }}>
-            {[['Step 1', 'Lunasi DPP\nSem 1 & 2'], ['→', null], ['Step 2', 'Verifikasi\nKeuangan'], ['→', null], ['Bonus', 'Credit Rp 1 jt\ndi Semester 3']].map((item, i) => (
-              item[1] === null
-                ? <div key={i} style={{ display: 'flex', alignItems: 'center', color: '#64748b', fontSize: '0.6rem', flexShrink: 0 }}>{item[0]}</div>
-                : <div key={i} style={{ flex: 1, padding: '8px 10px', background: '#131729', borderRadius: '8px', textAlign: 'center' }}>
-                  <div style={{ fontSize: '0.55rem', fontWeight: 800, color: '#818cf8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '3px' }}>{item[0]}</div>
-                  <div style={{ fontSize: '0.6rem', color: '#94a3b8', fontWeight: 600, lineHeight: 1.35, whiteSpace: 'pre-line' }}>{item[1]}</div>
-                </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Refund guarantee */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', background: 'linear-gradient(135deg,rgba(99,102,241,0.08),rgba(129,140,248,0.05))', border: '1.5px solid rgba(99,102,241,0.25)', borderRadius: '16px', padding: '14px 16px', marginTop: '8px' }}>
-        <div style={{ fontSize: '1.5rem', flexShrink: 0, lineHeight: 1 }}>🛡️</div>
-        <div>
-          <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#fff', marginBottom: '3px' }}>Garansi 100% Uang Kembali</div>
-          <div style={{ fontSize: '0.68rem', color: '#94a3b8', lineHeight: 1.55 }}>Jika kamu diterima di Perguruan Tinggi Negeri (PTN), biaya yang sudah dibayarkan ke UNPAS akan dikembalikan 100%. Daftar tanpa risiko!</div>
-        </div>
-      </div>
-
-      {/* Savings summary */}
-      {maxSaving > 0 && (
-        <div style={{ background: 'linear-gradient(135deg,rgba(16,185,129,0.08),rgba(34,211,238,0.06))', border: '1.5px solid rgba(16,185,129,0.2)', borderRadius: '16px', padding: '14px 16px', marginTop: '10px', textAlign: 'center' }}>
-          <div style={{ fontSize: '0.6rem', fontWeight: 700, color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '4px' }}>Total potongan yang bisa kamu dapatkan hingga</div>
-          <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#34d399', letterSpacing: '-0.5px' }}>-{fmt(maxSaving)}</div>
-          <div style={{ fontSize: '0.6rem', color: '#64748b', marginTop: '3px' }}>Potongan DP{isKedokteran ? '' : ' + Insentif Pelunasan DPP'} · Berlaku dengan syarat & ketentuan</div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ============================================================
-// MAIN QUIZ COMPONENT
+// MAIN COMPONENT
 // ============================================================
 export default function Quiz() {
-  const [screen, setScreen] = useState('landing');
-  const [curQ, setCurQ] = useState(0);
-  const [answers, setAnswers] = useState(Array(QS.length).fill(null));
-  const [form, setForm] = useState({ name: '', phone: '', school: '' });
-  const [resultData, setResultData] = useState(null);
-  const [openIdx, setOpenIdx] = useState(0);
-  const [confetti, setConfetti] = useState(false);
+  const [screen,      setScreen]      = useState('landing');
+  const [curQ,        setCurQ]        = useState(0);
+  const [answers,     setAnswers]     = useState(Array(QS.length).fill(null));
+  const [feeling,     setFeeling]     = useState(null);
+  const [form,        setForm]        = useState({ name:'', phone:'', school:'', kelas:'', prodiMinat:'' });
+  const [dimScores,   setDimScores]   = useState({ bisnis:0,sosial:0,sains:0,seni:0,publik:0,teknik:0 });
+  const [resultData,  setResultData]  = useState(null);
+  const [confetti,    setConfetti]    = useState(false);
+  const [loadingStep, setLoadingStep] = useState(0);
+  const [vibes,       setVibes]       = useState([]);
+  const topProdiRef = useRef(null);
+
+  const VIBE_PILLS = [
+    '😰 Takut salah pilih',
+    '🤷 Nggak tau minat gue apa',
+    '💸 Mikirin biaya',
+    '👨‍👩‍👧 Orang tua expect beda',
+    '🎯 Udah tau, mau konfirmasi',
+    '🙈 Ikut temen aja deh',
+  ];
+  const toggleVibe = (v) => setVibes(prev => prev.includes(v) ? prev.filter(x => x !== v) : [...prev, v]);
 
   // Inject CSS once
   useEffect(() => {
-    const id = 'qv3-global-css';
+    const id = 'qv5-global-css';
     if (!document.getElementById(id)) {
       const s = document.createElement('style');
       s.id = id; s.textContent = GLOBAL_CSS;
@@ -1020,327 +386,544 @@ export default function Quiz() {
     }
   }, []);
 
-  useEffect(() => { window.scrollTo({ top: 0, behavior: 'smooth' }); }, [screen]);
+  useEffect(() => { window.scrollTo({ top:0, behavior:'smooth' }); }, [screen]);
 
-  // Open ring animation when card opens
-  const prevOpenIdx = useRef(null);
-  useEffect(() => { prevOpenIdx.current = openIdx; }, [openIdx]);
+  const validatePhone = p => { const c = p.replace(/\D/g,''); return /^08\d{8,11}$/.test(c) ? c : null; };
 
-  // ── Input validation ──────────────────────────────────────
-  const validatePhone = (phone) => {
-    const cleaned = phone.replace(/\D/g, '');
-    return /^08\d{8,11}$/.test(cleaned) ? cleaned : null;
+  const recalcDim = (ans) => {
+    const ds = { bisnis:0,sosial:0,sains:0,seni:0,publik:0,teknik:0 };
+    ans.forEach((ai, qi) => {
+      if (ai !== null) Object.entries(QS[qi].opts[ai].scores).forEach(([k,v]) => { ds[k] = (ds[k]||0)+v; });
+    });
+    return ds;
   };
 
-  // ── Handlers ─────────────────────────────────────────────
-  const startQuiz = () => {
-    trackQuizStart(); // 📌 E2
+  // ── Landing ──────────────────────────────────────────────
+  const startQuiz = () => { trackQuizStart(); setScreen('feeling'); };
+
+  // ── Feeling ──────────────────────────────────────────────
+  const chooseFeelingAndNext = (f) => {
+    setFeeling(f);
     setCurQ(0);
     setAnswers(Array(QS.length).fill(null));
+    setDimScores({ bisnis:0,sosial:0,sains:0,seni:0,publik:0,teknik:0 });
     setScreen('quiz');
   };
 
-  const selectOpt = (idx) => {
-    const a = [...answers];
-    a[curQ] = idx;
-    setAnswers(a);
+  // ── Quiz ─────────────────────────────────────────────────
+  const selectOpt = (qi, oi) => {
+    const newAns = [...answers]; newAns[qi] = oi;
+    setAnswers(newAns);
+    const newDs = recalcDim(newAns);
+    setDimScores(newDs);
+    setTimeout(() => {
+      if (qi < QS.length - 1) { setCurQ(qi + 1); }
+      else {
+        trackQuizCompleted();
+        topProdiRef.current = calcScores(newDs)[0];
+        goToLoading(newDs);
+      }
+    }, 280);
   };
 
-  const prevQ = () => { if (curQ > 0) setCurQ(curQ - 1); };
+  const quizBack = () => { if (curQ > 0) setCurQ(curQ - 1); else setScreen('feeling'); };
 
-  const nextQ = () => {
-    if (answers[curQ] === null) return;
-    if (curQ < QS.length - 1) {
-      setCurQ(curQ + 1);
-    } else {
-      trackQuizCompleted(); // 📌 QuizCompleted — masuk form capture
+  // ── Loading ──────────────────────────────────────────────
+  const goToLoading = (ds) => {
+    setLoadingStep(0);
+    setScreen('loading');
+    [0,800,1600,2400,3000].forEach((delay, i) => setTimeout(() => setLoadingStep(i+1), delay));
+    setTimeout(() => {
+      topProdiRef.current = calcScores(ds || dimScores)[0];
       setScreen('capture');
-    }
+    }, 3600);
   };
 
+  // ── Capture ──────────────────────────────────────────────
   const submitData = async () => {
-    if (!form.name.trim() || !form.phone.trim() || !form.school.trim()) {
-      Swal.fire({ icon: 'warning', title: 'Data belum lengkap', text: 'Mohon isi Nama Lengkap, Nomor WhatsApp, dan Asal Sekolah ya 😊', confirmButtonText: 'OK' });
+    if (!form.name.trim() || !form.phone.trim() || !form.school.trim() || !form.kelas.trim()) {
+      Swal.fire({ icon:'warning', title:'Data belum lengkap', text:'Mohon isi Nama, Nomor WhatsApp, Asal Sekolah, dan Kelas ya 😊', confirmButtonText:'OK' });
       return;
     }
     const validPhone = validatePhone(form.phone);
     if (!validPhone) {
-      Swal.fire({ icon: 'error', title: 'Nomor tidak valid', text: 'Nomor WhatsApp harus diawali 08 dan terdiri dari 10–13 digit', confirmButtonText: 'Mengerti' });
+      Swal.fire({ icon:'error', title:'Nomor tidak valid', text:'Nomor WhatsApp harus diawali 08 dan terdiri dari 10–13 digit', confirmButtonText:'Mengerti' });
       return;
     }
-
-    // ── Hitung hasil quiz ──────────────────────────────────
-    const scores = {};
-    Object.keys(PD).forEach(k => scores[k] = 0);
-    answers.forEach((ai, qi) => {
-      if (ai !== null) {
-        const opt = QS[qi].options[ai];
-        Object.entries(opt.scores).forEach(([p, s]) => { scores[p] = (scores[p] || 0) + s; });
-      }
-    });
-    const sorted = Object.entries(scores).sort((a, b) => b[1] - a[1]).filter(([, s]) => s > 0);
-    const maxScore = sorted[0] ? sorted[0][1] : 1;
-    const top4 = sorted.slice(0, 4);
-    const topKey = top4[0][0];
-
-    setScreen('loading');
-
+    const scored = calcScores(dimScores);
+    const top    = scored[0];
+    setScreen('loading'); setLoadingStep(5);
     try {
-      // ── Kirim ke backend ─────────────
       await axios.post(API_URL, {
-        name: form.name.trim(),
-        phone: validPhone,
-        school: form.school.trim(),
+        name:       form.name.trim(),
+        phone:      validPhone,
+        school:     form.school.trim(),
+        kelas:      form.kelas.trim(),
+        prodiMinat: form.prodiMinat.trim(),
         answers,
-        // result: topKey
-        result: PD[topKey].name  
+        result:     top.title,
       });
-
-      await Swal.fire({ icon: 'success', title: 'Berhasil 🎉', text: 'Data kamu sudah tersimpan!', confirmButtonText: 'Lihat hasil' });
-
-    } catch (err) {
-      await Swal.fire({ icon: 'error', title: 'Oops...', text: 'Terjadi kesalahan saat mengirim data', confirmButtonText: 'Coba lagi' });
+      await Swal.fire({ icon:'success', title:'Berhasil 🎉', text:'Data kamu sudah tersimpan!', confirmButtonText:'Lihat hasil' });
+    } catch {
+      await Swal.fire({ icon:'error', title:'Oops...', text:'Terjadi kesalahan saat mengirim data', confirmButtonText:'Coba lagi' });
     }
+    doShowResult(scored, top);
+    trackLead();
+    trackViewContent(top);
+  };
 
-    // ── Tampilkan result ───────────────────────────────────
-    setResultData({ top4, maxScore });
-    setOpenIdx(0);
+  const skipCapture = () => {
+    const scored = calcScores(dimScores);
+    doShowResult(scored, scored[0]);
+  };
+
+  const doShowResult = (scored, top) => {
+    const topDim = Object.entries(dimScores).sort((a,b)=>b[1]-a[1])[0]?.[0] || 'bisnis';
+    setResultData({ scored, top, persona: PERSONAS[topDim] || PERSONAS.bisnis });
     setScreen('result');
     setConfetti(true);
     setTimeout(() => setConfetti(false), 4500);
-
-    trackLead();               // 📌 Lead — main conversion event
-    trackViewContent(top4);    // 📌 ViewContent — prodi #1, fak, biaya, top 4
   };
 
+  // ── Result actions ────────────────────────────────────────
   const handleDaftar = () => {
-    trackInitiateCheckout(); // 📌 InitiateCheckout — klik daftar PMB
+    if (resultData) trackInitiateCheckout(resultData.top.title);
     window.open('https://pmb.unpas.ac.id', '_blank');
   };
-
   const handleChat = () => {
-    const topProdi = resultData ? PD[resultData.top4[0][0]] : null;
-    trackContact(topProdi?.name || ''); // 📌 Contact — klik chat admisi WA
-    const msg = encodeURIComponent(
-      `Halo, saya ${form.name}. Saya baru selesai tes kecocokan prodi dan hasilnya cocok di ${topProdi?.name}. Bisa info lebih lanjut soal pendaftaran, biaya, dan potongan?`
-    );
+    if (!resultData) return;
+    trackContact(resultData.top.title);
+    const msg = encodeURIComponent(`Halo, saya ${form.name || 'calon mahasiswa'}. Saya baru selesai tes kecocokan prodi dan hasilnya cocok di ${resultData.top.title}. Bisa info lebih lanjut soal pendaftaran, biaya, dan potongan?`);
     window.open(`https://wa.me/62811960193?text=${msg}`, '_blank');
   };
-
   const handleShare = () => {
-    const text = "Aku baru coba Tes Kecocokan Prodi dari UNPAS dan hasilnya seru! Coba juga yuk 🎯👉 https://pmb.unpas.ac.id/quiz/";
-    if (navigator.share) navigator.share({ title: 'Tes Kecocokan Prodi UNPAS', text });
-    else navigator.clipboard.writeText(text).then(() => alert('Link sudah dicopy! Share ke teman kamu ya 😊'));
+    if (!resultData) return;
+    const txt = `Aku baru coba Tes Kecocokan Prodi dari UNPAS dan hasilnya ${resultData.top.emoji} ${resultData.top.title} (${resultData.top.pct}% cocok)! Coba juga yuk 🎯👉 https://pmb.unpas.ac.id/quiz/`;
+    if (navigator.share) navigator.share({ title:'Hasil Prodi Finder UNPAS', text:txt });
+    else navigator.clipboard.writeText(txt).then(() => alert('Link sudah dicopy!'));
+  };
+  const restartQuiz = () => {
+    setScreen('landing'); setCurQ(0);
+    setAnswers(Array(QS.length).fill(null)); setFeeling(null);
+    setForm({ name:'',phone:'',school:'',kelas:'',prodiMinat:'' });
+    setDimScores({ bisnis:0,sosial:0,sains:0,seni:0,publik:0,teknik:0 });
+    setResultData(null); topProdiRef.current = null;
   };
 
-  const progressPct = Math.round((curQ / QS.length) * 100);
-  const hasAnswer = answers[curQ] !== null;
-  const isLastQ = curQ === QS.length - 1;
+  // ── Common styles ─────────────────────────────────────────
+  const WRAP = { maxWidth:'540px', margin:'0 auto', padding:'1rem', minHeight:'100vh', fontFamily:"'Plus Jakarta Sans',sans-serif", background:'var(--bg)', color:'var(--text)' };
+  const GOLD = '#F5C842', ACC = '#7C6EF5';
 
-  // ── RENDER ───────────────────────────────────────────────
-  return (
-    <>
-      <Confetti active={confetti} />
-
-      {/* Container — max-width 540px sesuai HTML v3 */}
-      <div style={{ maxWidth: '540px', margin: '0 auto', padding: '1rem', minHeight: '100vh', display: 'flex', flexDirection: 'column', fontFamily: "'Plus Jakarta Sans', sans-serif", background: '#0c0f1a', color: '#f1f5f9' }}>
-
-        {/* ════ LANDING ════ */}
-        {screen === 'landing' && (
-          <div style={{ display: 'flex', flexDirection: 'column', flex: 1, textAlign: 'center', justifyContent: 'center', alignItems: 'center', padding: '2rem 0.5rem', gap: '0.5rem' }}>
-            {/* <div className="qv3-float" style={{ fontSize:'3rem' }}>🎯</div> */}
-
-            <div className="qv3-float">
-              <img
-                src="/quiz/logo_unpas.png"
-                alt="Logo Universitas Pasundan"
-                style={{ width: '80px', height: 'auto', objectFit: 'contain' }}
-              />
-            </div>
-
-            {/* Live pill */}
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '100px', background: 'linear-gradient(135deg,#4f46e5,#818cf8)', fontSize: '0.7rem', fontWeight: 700, color: '#fff', margin: '0.8rem 0' }}>
-              <div className="qv3-pulse" style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#fff', flexShrink: 0 }} />
-              2.847 orang sudah coba!
-            </div>
-
-            <h1 style={{ fontSize: 'clamp(1.6rem,5vw,2rem)', fontWeight: 900, lineHeight: 1.15, color: '#fff' }}>
-              Cocok di{' '}
-              <em style={{ fontStyle: 'normal', background: 'linear-gradient(135deg,#818cf8,#22d3ee)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
-                Prodi Apa
-              </em>{' '}
-              Kamu?
-            </h1>
-
-            <p style={{ color: '#94a3b8', fontSize: '0.95rem', maxWidth: '380px', margin: '0.3rem auto 0.8rem', lineHeight: 1.6 }}>
-              Jawab 10 pertanyaan singkat, temukan prodi yang sesuai minat kamu — lengkap dengan info biaya & potongan!
-            </p>
-
-            {/* Stats row */}
-            <div style={{ display: 'flex', gap: '1.5rem', justifyContent: 'center', margin: '0.5rem 0 1.5rem' }}>
-              {[['27', 'Program Studi'], ['7', 'Fakultas'], ['~2 min', 'Durasi']].map(([n, l]) => (
-                <div key={l} style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#818cf8' }}>{n}</div>
-                  <div style={{ fontSize: '0.62rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '2px' }}>{l}</div>
-                </div>
-              ))}
-            </div>
-
-            <button className="qv3-btn-start" onClick={startQuiz}>Mulai Tes →</button>
-
-            {/* Features */}
-            <div style={{ display: 'flex', gap: '1.2rem', justifyContent: 'center', marginTop: '1.2rem', flexWrap: 'wrap' }}>
-              {[['✅', 'Gratis'], ['🎯', 'Personal'], ['💰', 'Info Biaya'], ['🎁', 'Info Potongan']].map(([ic, label]) => (
-                <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.72rem', color: '#64748b', fontWeight: 500 }}>
-                  <div className="qv3-feat-ic">{ic}</div>
-                  {label}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* ════ QUIZ ════ */}
-        {screen === 'quiz' && (
-          <div style={{ display: 'flex', flexDirection: 'column', flex: 1, padding: '0.5rem 0' }}>
-            {/* Progress bar */}
-            <div style={{ height: '5px', background: '#222845', borderRadius: '100px', marginBottom: '1.5rem', overflow: 'hidden' }}>
-              <div style={{ height: '100%', background: 'linear-gradient(90deg,#4f46e5,#22d3ee)', borderRadius: '100px', width: `${progressPct}%`, transition: 'width 0.4s ease' }} />
-            </div>
-
-            {/* Q meta */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
-              <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                Pertanyaan {curQ + 1} dari {QS.length}
-              </div>
-              <div style={{ fontSize: '1.3rem' }}>{QS[curQ].icon}</div>
-            </div>
-
-            {/* Q text */}
-            <div className="qv3-q-text" style={{ fontSize: '1.15rem', fontWeight: 800, color: '#fff', lineHeight: 1.35, marginBottom: '0.3rem' }}>
-              {QS[curQ].text}
-            </div>
-
-            {/* Q hint */}
-            <div style={{ fontSize: '0.76rem', color: '#64748b', marginBottom: '1.2rem', fontWeight: 500 }}>
-              {QS[curQ].hint}
-            </div>
-
-            {/* Options */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-              {QS[curQ].options.map((opt, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  className={`qv3-option${answers[curQ] === i ? ' qv3-sel' : ''}`}
-                  onClick={() => selectOpt(i)}
-                >
-                  <span style={{ fontSize: '1.3rem', flexShrink: 0, width: '32px', textAlign: 'center', lineHeight: 1 }}>{opt.icon}</span>
-                  <span className="qv3-opt-txt" style={{ fontSize: '0.88rem', fontWeight: 600, color: '#f1f5f9', lineHeight: 1.35 }}>{opt.text}</span>
-                </button>
-              ))}
-            </div>
-
-            {/* Navigation */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1.5rem', paddingTop: '0.5rem' }}>
-              <button type="button" className="qv3-btn-back" onClick={prevQ} style={{ visibility: curQ === 0 ? 'hidden' : 'visible' }}>
-                ← Kembali
-              </button>
-              <button type="button" className={`qv3-btn-next${!hasAnswer ? ' qv3-dim' : ''}`} onClick={nextQ}>
-                {isLastQ ? 'Lihat Hasil 🎉' : 'Lanjut →'}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ════ CAPTURE ════ */}
-        {screen === 'capture' && (
-          <div style={{ display: 'flex', flexDirection: 'column', flex: 1, justifyContent: 'center', padding: '1.5rem 0.5rem' }}>
-            <div style={{ background: '#1a1f35', border: '1.5px solid #2a3055', borderRadius: '16px', padding: '1.8rem 1.5rem' }}>
-              <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#fff', marginBottom: '0.3rem' }}>Satu langkah lagi! 🎉</h2>
-              <p style={{ color: '#94a3b8', fontSize: '0.85rem', marginBottom: '1.3rem', lineHeight: 1.6 }}>
-                Isi data singkat untuk lihat hasil tes, rekomendasi prodi, dan info potongan biaya kamu.
-              </p>
-
-              {[
-                { label: 'Nama Lengkap', key: 'name', type: 'text', ph: 'Masukkan nama kamu' },
-                { label: 'Nomor WhatsApp', key: 'phone', type: 'tel', ph: '08xxxxxxxxxx' },
-                { label: 'Asal Sekolah', key: 'school', type: 'text', ph: 'Nama SMA/SMK kamu' },
-              ].map(({ label, key, type, ph }) => (
-                <div key={key} style={{ marginBottom: '0.8rem' }}>
-                  <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#94a3b8', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                    {label}
-                  </label>
-                  <input className="qv3-input" type={type} placeholder={ph} value={form[key]} onChange={e => setForm({ ...form, [key]: e.target.value })} />
-                </div>
-              ))}
-
-              <button className="qv3-btn-submit" type="button" onClick={submitData}>
-                Lihat Hasil Tes Saya →
-              </button>
-              <p style={{ fontSize: '0.65rem', color: '#64748b', textAlign: 'center', marginTop: '0.8rem' }}>
-                🔒 Data kamu aman. Hanya digunakan untuk rekomendasi & info PMB UNPAS.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* ════ LOADING ════ */}
-        {screen === 'loading' && (
-          <div style={{ display: 'flex', flexDirection: 'column', flex: 1, justifyContent: 'center', alignItems: 'center', textAlign: 'center', padding: '2rem' }}>
-            <div className="qv3-spinner" style={{ width: '44px', height: '44px', border: '4px solid #2a3055', borderTopColor: '#818cf8', borderRadius: '50%', margin: '0 auto 1rem' }} />
-            <p style={{ color: '#94a3b8', fontSize: '0.88rem', fontWeight: 500 }}>Menganalisis jawaban kamu...</p>
-          </div>
-        )}
-
-        {/* ════ RESULT ════ */}
-        {screen === 'result' && resultData && (
-          <div style={{ display: 'flex', flexDirection: 'column', flex: 1, padding: '0.5rem 0 2rem' }}>
-            {/* Header */}
-            <div style={{ textAlign: 'center', marginBottom: '1.2rem' }}>
-              <span className="qv3-float" style={{ fontSize: '2.5rem', display: 'block', marginBottom: '0.3rem' }}>🎉</span>
-              <h2 style={{ fontSize: '1.3rem', fontWeight: 900, color: '#fff' }}>Hasil Tes Kamu!</h2>
-              <p style={{ fontSize: '0.82rem', color: '#94a3b8', marginTop: '0.2rem' }}>Rekomendasi prodi + info biaya & potongan yang bisa kamu dapatkan</p>
-            </div>
-
-            {/* Prodi result cards */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.7rem', marginBottom: '1rem' }}>
-              {resultData.top4.map(([key, score], i) => (
-                <ProdiCard
-                  key={key}
-                  prodiKey={key}
-                  score={score}
-                  maxScore={resultData.maxScore}
-                  rank={i}
-                  openIdx={openIdx}
-                  setOpenIdx={setOpenIdx}
-                />
-              ))}
-            </div>
-
-            {/* Promo section */}
-            <PromoSection topKey={resultData.top4[0][0]} />
-
-            {/* CTA buttons */}
-            <div className="qv3-anim-up qv3-d6" style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginTop: '0.3rem' }}>
-              <button type="button" className="qv3-btn-cta-primary" onClick={handleDaftar}>
-                📋 Daftar Sekarang di PMB UNPAS →
-              </button>
-              <button type="button" className="qv3-btn-cta-secondary" onClick={handleChat}>
-                💬 Chat Tim Admisi
-              </button>
-              <button type="button" className="qv3-btn-share" onClick={handleShare}>
-                📤 Share Hasil ke Teman
-              </button>
-            </div>
-
-            <div style={{ textAlign: 'center', fontSize: '0.6rem', color: '#64748b', marginTop: '1.2rem', fontWeight: 500, opacity: 0.6 }}>
-              Universitas Pasundan — Pilihan Pasti Setiap Generasi
-            </div>
-          </div>
-        )}
-
+  // ════════════════════════════════════════════════
+  // LANDING
+  // ════════════════════════════════════════════════
+  if (screen === 'landing') return (
+    <div className="qv5-fadeUp" style={{ width:'100%', minHeight:'100vh', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', textAlign:'center', padding:'60px 24px', fontFamily:"'Plus Jakarta Sans',sans-serif", background:`radial-gradient(ellipse 80% 60% at 50% 0%,rgba(124,110,245,.18) 0%,transparent 70%),var(--bg)`, color:'var(--text)', boxSizing:'border-box' }}>
+      <div className="qv5-float" style={{ marginBottom:24 }}>
+        <img src="/quiz/logo_unpas.png" alt="Logo UNPAS" style={{ width:72, height:'auto', objectFit:'contain' }} />
       </div>
-    </>
+      <div style={{ display:'inline-flex', alignItems:'center', gap:6, background:'rgba(245,200,66,.15)', border:'1px solid rgba(245,200,66,.3)', color:GOLD, fontSize:11, fontWeight:700, letterSpacing:2, textTransform:'uppercase', padding:'6px 16px', borderRadius:20, marginBottom:24 }}>
+        <span className="qv5-pulse" style={{ width:6, height:6, borderRadius:'50%', background:GOLD, display:'inline-block' }} />
+        UNPAS · Panduan Milih Prodi
+      </div>
+      <h1 style={{ fontSize:'clamp(28px,8vw,50px)', fontWeight:900, lineHeight:1.1, marginBottom:16 }}>
+        Bingung mau<br />
+        <span style={{ background:'linear-gradient(135deg,#F5C842,#FF9F45,#7C6EF5)', backgroundSize:'200% auto', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', backgroundClip:'text' }}>
+          kuliah jurusan apa?
+        </span>
+      </h1>
+      <p style={{ fontSize:15, color:'var(--muted)', lineHeight:1.8, maxWidth:400, marginBottom:28 }}>
+        <strong style={{ color:'var(--text)' }}>Tenang, kamu nggak sendirian.</strong><br />
+        Ribuan calon mahasiswa ngerasa hal yang sama. Kita bantu kamu nemuin prodi yang beneran cocok — bukan cuma ikut-ikutan temen.
+      </p>
+      <div style={{ display:'flex', flexWrap:'nowrap', gap:8, overflowX:'auto', width:'100%', justifyContent:'center', marginBottom:28, padding:'4px 0', scrollbarWidth:'none', msOverflowStyle:'none', WebkitOverflowScrolling:'touch' }}>
+        {VIBE_PILLS.map(v => (
+          <button key={v} onClick={() => toggleVibe(v)}
+            style={{ padding:'8px 16px', borderRadius:20, fontSize:13, fontWeight:500,
+              whiteSpace:'nowrap', flexShrink:0,
+              border:`1px solid ${vibes.includes(v) ? 'rgba(245,200,66,.35)' : 'rgba(255,255,255,.13)'}`,
+              color: vibes.includes(v) ? GOLD : 'rgba(240,237,232,.5)',
+              background: vibes.includes(v) ? 'rgba(245,200,66,.13)' : 'rgba(255,255,255,.04)',
+              cursor:'pointer', transition:'border-color .2s, color .2s, background .2s',
+              fontFamily:"'Plus Jakarta Sans',sans-serif" }}
+          >{v}</button>
+        ))}
+      </div>
+      <button onClick={startQuiz}
+        style={{ display:'inline-flex', alignItems:'center', gap:10, background:`linear-gradient(135deg,${GOLD},#FF9F45)`, color:'#0D0F1A', fontSize:16, fontWeight:800, padding:'16px 36px', borderRadius:16, border:'none', cursor:'pointer', boxShadow:`0 8px 32px rgba(245,200,66,.3)`, transition:'.25s', fontFamily:"'Plus Jakarta Sans',sans-serif" }}
+        onMouseOver={e => { e.currentTarget.style.transform='translateY(-2px)'; }}
+        onMouseOut={e  => { e.currentTarget.style.transform=''; }}
+      >
+        Mulai Temukan Prodimu
+        <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </button>
+      <div style={{ marginTop:32, display:'flex', alignItems:'center', gap:20, justifyContent:'center', flexWrap:'wrap' }}>
+        {[['✦ 27 Prodi S1'],['✦ 7 Fakultas'],['✦ Akreditasi Unggul'],['✦ ~3 menit']].map(([l]) => (
+          <span key={l} style={{ fontSize:12, color:'var(--muted2)' }}>{l}</span>
+        ))}
+      </div>
+    </div>
+  );
+
+  // ════════════════════════════════════════════════
+  // FEELING
+  // ════════════════════════════════════════════════
+  if (screen === 'feeling') return (
+    <div className="qv5-fadeUp" style={{ ...WRAP, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'40px 20px', background:`radial-gradient(ellipse 60% 50% at 50% 100%,rgba(248,113,113,.1) 0%,transparent 70%),var(--bg)` }}>
+      <div style={{ width:'100%', maxWidth:480, textAlign:'center' }}>
+        <div className="qv5-float" style={{ fontSize:44, marginBottom:20 }}>🤔</div>
+        <h2 style={{ fontSize:'clamp(22px,6vw,34px)', fontWeight:900, lineHeight:1.2, marginBottom:12 }}>
+          Jujur deh,<br />sekarang kamu lagi ngerasa gimana?
+        </h2>
+        <p style={{ fontSize:14, color:'var(--muted)', lineHeight:1.7, marginBottom:28 }}>
+          Ini bukan soal benar atau salah. Kita mau mulai dari tempat yang beneran kamu rasain sekarang.
+        </p>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:24 }}>
+          {[
+            { key:'galau',    emoji:'😵‍💫', label:'Galau banget',            sub:'Banyak pilihan tapi nggak ada yang yakin' },
+            { key:'excited',  emoji:'✨',    label:'Excited tapi bingung',    sub:'Ngerasa ada yang cocok tapi belum yakin' },
+            { key:'pressure', emoji:'😮‍💨', label:'Ada tekanan',             sub:'Orang tua atau lingkungan punya ekspektasi' },
+            { key:'ready',    emoji:'💪',    label:'Siap & mau konfirmasi',   sub:'Udah ada gambaran, tinggal mastiin' },
+          ].map(({ key, emoji, label, sub }) => (
+            <button key={key} onClick={() => chooseFeelingAndNext(key)}
+              style={{ all:'unset', boxSizing:'border-box', background: feeling===key ? 'var(--accent2)' : 'var(--card)', border:`1.5px solid ${feeling===key ? ACC : 'rgba(255,255,255,.08)'}`, borderRadius:20, padding:'20px 16px', cursor:'pointer', textAlign:'center', transition:'.25s', display:'block', width:'100%' }}
+            >
+              <span style={{ fontSize:30, display:'block', marginBottom:8 }}>{emoji}</span>
+              <span style={{ fontSize:14, fontWeight:700, color:'var(--text)', display:'block', marginBottom:4 }}>{label}</span>
+              <span style={{ fontSize:11.5, color:'var(--muted)', lineHeight:1.4, display:'block' }}>{sub}</span>
+            </button>
+          ))}
+        </div>
+        <button onClick={() => chooseFeelingAndNext('skip')}
+          style={{ background:'none', border:'none', cursor:'pointer', fontSize:12, color:'var(--muted2)', fontFamily:"'Plus Jakarta Sans',sans-serif", textDecoration:'underline', textUnderlineOffset:3 }}
+        >
+          Lewati pertanyaan ini →
+        </button>
+      </div>
+    </div>
+  );
+
+  // ════════════════════════════════════════════════
+  // QUIZ
+  // ════════════════════════════════════════════════
+  if (screen === 'quiz') {
+    const q = QS[curQ];
+    const pct = Math.round((curQ / QS.length) * 100);
+    return (
+      <div className="qv5-fadeUp" style={{ ...WRAP, padding:0 }}>
+        <div style={{ padding:'20px 20px 16px', position:'sticky', top:0, background:'var(--bg)', zIndex:50, borderBottom:'1px solid var(--border)' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:14 }}>
+            <button onClick={quizBack} style={{ all:'unset', boxSizing:'border-box', width:36, height:36, borderRadius:10, background:'var(--card)', border:'1px solid var(--border)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', fontSize:16, flexShrink:0 }}>←</button>
+            <span style={{ fontSize:12, fontWeight:700, color:'var(--muted)', letterSpacing:1, textTransform:'uppercase' }}>Pertanyaan {curQ+1}</span>
+            <span style={{ marginLeft:'auto', fontSize:12, fontWeight:700, color:GOLD }}>{curQ+1} / {QS.length}</span>
+          </div>
+          <div style={{ height:4, background:'var(--bg3)', borderRadius:4, overflow:'hidden' }}>
+            <div className="qv5-prog-fill" style={{ width:`${pct}%` }} />
+          </div>
+        </div>
+
+        <div style={{ padding:'28px 20px 60px', maxWidth:540, margin:'0 auto' }}>
+          {curQ === 0 && feeling && feeling !== 'skip' && FEELING_RESPONSES[feeling] && (
+            <div style={{ background:'var(--accent2)', border:'1px solid rgba(124,110,245,.3)', borderRadius:16, padding:'14px 18px', marginBottom:24, fontSize:13.5, color:'var(--text)', lineHeight:1.7 }}
+              dangerouslySetInnerHTML={{ __html:`💬 ${FEELING_RESPONSES[feeling]}` }}
+            />
+          )}
+          <div style={{ display:'inline-flex', alignItems:'center', gap:6, fontSize:11, fontWeight:700, letterSpacing:1.5, textTransform:'uppercase', color:ACC, marginBottom:10, background:'var(--accent2)', padding:'4px 12px', borderRadius:20 }}>
+            {q.context}
+          </div>
+          <div style={{ fontSize:'clamp(18px,5vw,26px)', fontWeight:800, lineHeight:1.3, color:'var(--text)', marginBottom:8 }}>{q.q}</div>
+          <div style={{ fontSize:13, color:'var(--muted)', lineHeight:1.6, marginBottom:28 }}>{q.hint}</div>
+          <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+            {q.opts.map((opt, oi) => {
+              const chosen = answers[curQ] === oi;
+              return (
+                <button key={oi} className={`qv5-opt${chosen ? ' chosen' : ''}`} onClick={() => selectOpt(curQ, oi)}>
+                  <div className="qv5-opt-icon">{opt.icon}</div>
+                  <div style={{ flex:1 }}>
+                    <span style={{ fontSize:15, fontWeight:700, color:'var(--text)', display:'block', marginBottom:3 }}>{opt.main}</span>
+                    <span style={{ fontSize:12, color:'var(--muted)', lineHeight:1.45, display:'block' }}>{opt.sub}</span>
+                  </div>
+                  <div className="qv5-opt-check">{chosen ? '✓' : ''}</div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ════════════════════════════════════════════════
+  // LOADING
+  // ════════════════════════════════════════════════
+  if (screen === 'loading') {
+    const msgs = [
+      { txt:'Lagi nganalisis jawaban kamu...',             bold:false },
+      { txt:'Mencocokkan profil ke 27 prodi UNPAS...',     bold:false },
+      { txt:'Nemu beberapa yang menarik nih! 🎯',         bold:false },
+      { txt:'Hampir selesai...',                          bold:false },
+      { txt:'Ketemu!',                                    bold:true  },
+    ];
+    return (
+      <div className="qv5-fadeUp" style={{ ...WRAP, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', textAlign:'center', padding:'40px 20px' }}>
+        <div className="qv5-spinner" style={{ width:100, height:100, borderRadius:'50%', background:'conic-gradient(#F5C842,#7C6EF5,#34D399,#F5C842)', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 28px' }}>
+          <div style={{ width:80, height:80, borderRadius:'50%', background:'var(--bg)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:32 }}>🔍</div>
+        </div>
+        <div style={{ minHeight:80, display:'flex', flexDirection:'column', alignItems:'center', gap:8 }}>
+          {msgs.slice(0, loadingStep).map((m, i) => (
+            <div key={i} className="qv5-fadeUp" style={{ fontSize:m.bold?18:15, fontWeight:m.bold?800:400, color:m.bold?'var(--text)':'var(--muted)', lineHeight:1.6 }}>
+              {m.txt}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // ════════════════════════════════════════════════
+  // CAPTURE
+  // ════════════════════════════════════════════════
+  if (screen === 'capture') {
+    const peek = topProdiRef.current;
+    return (
+      <div className="qv5-fadeUp" style={{ ...WRAP, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'40px 20px', background:`radial-gradient(ellipse 70% 60% at 50% 0%,rgba(245,200,66,.1) 0%,transparent 60%),var(--bg)` }}>
+        <div style={{ width:'100%', maxWidth:420, textAlign:'center' }}>
+          <div className="qv5-float" style={{ fontSize:44, marginBottom:20 }}>🎯</div>
+          <h2 style={{ fontSize:'clamp(20px,5vw,28px)', fontWeight:900, lineHeight:1.25, marginBottom:8 }}>Hasil kamu udah siap!</h2>
+          <p style={{ fontSize:13.5, color:'var(--muted)', lineHeight:1.7, marginBottom:20 }}>
+            Isi data untuk lihat rekomendasi prodi lengkap + info potongan DP yang berlaku.
+          </p>
+          {peek && (
+            <div style={{ background:'var(--card)', border:'1.5px solid var(--border2)', borderRadius:20, padding:20, marginBottom:24, position:'relative', overflow:'hidden' }}>
+              <div style={{ fontSize:18, fontWeight:800, color:GOLD, marginBottom:4 }}>{peek.emoji} {peek.title} ({peek.pct}% cocok)</div>
+              <div style={{ fontSize:13, color:'var(--muted)' }}>+ 3 prodi alternatif yang juga cocok</div>
+              <div style={{ position:'absolute', inset:0, backdropFilter:'blur(8px)', background:'rgba(13,15,26,.7)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:24, letterSpacing:4, color:'var(--muted2)' }}>🔒 🔒 🔒</div>
+            </div>
+          )}
+          <div style={{ display:'flex', flexDirection:'column', gap:12, marginBottom:16, textAlign:'left' }}>
+            <input className="qv5-input" type="text"    placeholder="Nama lengkap kamu"            value={form.name}      onChange={e => setForm({...form, name:e.target.value})} />
+            <input className="qv5-input" type="tel"     placeholder="Nomor WhatsApp (08xx...)"    value={form.phone}     onChange={e => setForm({...form, phone:e.target.value})} />
+            <input className="qv5-input" type="text"    placeholder="Asal sekolah kamu"           value={form.school}    onChange={e => setForm({...form, school:e.target.value})} />
+            <div style={{ position:'relative' }}>
+              <select className={`qv5-select${!form.kelas ? ' empty' : ''}`} value={form.kelas} onChange={e => setForm({...form, kelas:e.target.value})}>
+                <option value="">Kelas kamu sekarang</option>
+                <optgroup label="Kelas 10">
+                  <option value="Kelas 10 IPA">Kelas 10 IPA</option>
+                  <option value="Kelas 10 IPS">Kelas 10 IPS</option>
+                  <option value="Kelas 10 Bahasa">Kelas 10 Bahasa</option>
+                  <option value="Kelas 10">Kelas 10 (lainnya)</option>
+                </optgroup>
+                <optgroup label="Kelas 11">
+                  <option value="Kelas 11 IPA">Kelas 11 IPA</option>
+                  <option value="Kelas 11 IPS">Kelas 11 IPS</option>
+                  <option value="Kelas 11 Bahasa">Kelas 11 Bahasa</option>
+                  <option value="Kelas 11">Kelas 11 (lainnya)</option>
+                </optgroup>
+                <optgroup label="Kelas 12">
+                  <option value="Kelas 12 IPA">Kelas 12 IPA</option>
+                  <option value="Kelas 12 IPS">Kelas 12 IPS</option>
+                  <option value="Kelas 12 Bahasa">Kelas 12 Bahasa</option>
+                  <option value="Kelas 12">Kelas 12 (lainnya)</option>
+                </optgroup>
+                <option value="Sudah Lulus SMA">Sudah Lulus SMA / Sederajat</option>
+                <option value="Mahasiswa Transfer">Mahasiswa Transfer / RPL</option>
+              </select>
+              <span style={{ position:'absolute', right:16, top:'50%', transform:'translateY(-50%)', pointerEvents:'none', fontSize:12, color:'var(--muted)' }}>▾</span>
+            </div>
+            <input className="qv5-input" type="text" placeholder="Prodi yang diminati (opsional)" value={form.prodiMinat} onChange={e => setForm({...form, prodiMinat:e.target.value})} />
+          </div>
+          <button onClick={submitData}
+            style={{ all:'unset', boxSizing:'border-box', display:'block', width:'100%', padding:15, borderRadius:14, background:`linear-gradient(135deg,${GOLD},#FF9F45)`, color:'#0D0F1A', fontSize:16, fontWeight:800, cursor:'pointer', textAlign:'center', transition:'.2s', fontFamily:"'Plus Jakarta Sans',sans-serif", marginBottom:12 }}
+            onMouseOver={e => { e.currentTarget.style.opacity='.9'; e.currentTarget.style.transform='translateY(-1px)'; }}
+            onMouseOut={e  => { e.currentTarget.style.opacity='1';  e.currentTarget.style.transform=''; }}
+          >
+            Lihat Hasil Lengkap →
+          </button>
+          <p style={{ fontSize:11, color:'var(--muted2)', lineHeight:1.5, marginBottom:8 }}>🔒 Data kamu aman. Hanya digunakan tim admisi UNPAS untuk follow-up.</p>
+          <button onClick={skipCapture}
+            style={{ background:'none', border:'none', cursor:'pointer', fontSize:12, color:'var(--muted2)', fontFamily:"'Plus Jakarta Sans',sans-serif", textDecoration:'underline', textUnderlineOffset:3, display:'block', width:'100%', textAlign:'center' }}
+          >
+            Lewati, lihat hasil tanpa simpan data
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ════════════════════════════════════════════════
+  // RESULT
+  // ════════════════════════════════════════════════
+  if (screen === 'result' && resultData) {
+    const { scored, top, persona } = resultData;
+    const others  = scored.slice(1, 5);
+    const topFac  = FAC[top.fac] || { name:'', color:GOLD, short:'' };
+    const biaya   = BIAYA[top.id] || 'Hubungi CS';
+    const proof   = SOCIAL[top.id] || '';
+    const fm      = FEELING_MSGS[feeling || 'skip'] || FEELING_MSGS.skip;
+    const whyMsg  = (top.why && (top.why[feeling] || top.why.ready)) || 'Berdasarkan jawabanmu, prodi ini paling match sama profil dan nilai-nilaimu.';
+
+    return (
+      <>
+        <Confetti active={confetti} />
+        <div className="qv5-fadeUp" style={{ ...WRAP, padding:0, overflowY:'auto' }}>
+
+          {/* Urgency bar */}
+          <div style={{ background:'linear-gradient(135deg,rgba(248,113,113,.15),rgba(251,146,60,.15))', border:'1px solid rgba(248,113,113,.3)', padding:'10px 20px', display:'flex', alignItems:'center', justifyContent:'center', gap:10, fontSize:13, fontWeight:600, color:'#F87171' }}>
+            <span className="qv5-pulse" style={{ width:7, height:7, borderRadius:'50%', background:'#F87171', flexShrink:0, display:'inline-block' }} />
+            ⏳ Potongan DP Rp 1,5 juta · berlaku sampai 30 Juni 2026 · Kuota terbatas
+          </div>
+
+          {/* Hero */}
+          <div style={{ padding:'36px 20px 28px', textAlign:'center', background:`radial-gradient(ellipse 70% 50% at 50% 0%,rgba(52,211,153,.12) 0%,transparent 60%),var(--bg)`, borderBottom:'1px solid var(--border)' }}>
+            <div className="qv5-float" style={{ fontSize:36, marginBottom:16 }}>{fm.confetti}</div>
+            <div style={{ fontSize:13, fontWeight:700, letterSpacing:2, textTransform:'uppercase', color:'#34D399', background:'var(--green2)', padding:'4px 14px', borderRadius:20, display:'inline-block', marginBottom:16 }}>{fm.greeting}</div>
+            <h2 style={{ fontSize:'clamp(20px,5vw,30px)', fontWeight:900, lineHeight:1.2, marginBottom:8 }}>
+              {typeof fm.title === 'function' ? fm.title(top.title) : fm.title}
+            </h2>
+            <p style={{ fontSize:14, color:'var(--muted)', lineHeight:1.7, maxWidth:360, margin:'0 auto 20px' }}>{fm.sub}</p>
+            <div style={{ display:'inline-flex', alignItems:'center', gap:8, background:'var(--card)', border:'1.5px solid var(--border2)', borderRadius:12, padding:'10px 20px', fontSize:14, fontWeight:700 }}>
+              <span style={{ fontSize:20 }}>{persona.emoji}</span><span>{persona.label}</span>
+            </div>
+          </div>
+
+          {/* Body */}
+          <div style={{ padding:'20px', maxWidth:600, margin:'0 auto' }}>
+
+            <SectionTitle>Rekomendasi Utama</SectionTitle>
+
+            {/* Top card */}
+            <div className="qv5-popin" style={{ background:'linear-gradient(135deg,var(--bg3),var(--card))', border:`2px solid ${GOLD}`, borderRadius:24, padding:24, marginBottom:12, position:'relative', overflow:'hidden' }}>
+              <div style={{ position:'absolute', top:-40, right:-40, width:160, height:160, borderRadius:'50%', background:'radial-gradient(circle,rgba(245,200,66,.12),transparent 70%)', pointerEvents:'none' }} />
+              <div style={{ display:'inline-flex', alignItems:'center', gap:5, background:GOLD, color:'#0D0F1A', fontSize:10, fontWeight:700, letterSpacing:1, textTransform:'uppercase', padding:'3px 10px', borderRadius:20, marginBottom:14 }}>⭐ Paling Cocok</div>
+              <div style={{ fontSize:11, fontWeight:700, letterSpacing:1.5, textTransform:'uppercase', color:topFac.color, marginBottom:6 }}>{topFac.name}</div>
+              <div style={{ fontSize:24, fontWeight:900, marginBottom:8, lineHeight:1.2 }}>{top.emoji} {top.title}</div>
+
+              <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:16 }}>
+                <span style={{ fontSize:22, fontWeight:700, color:GOLD, flexShrink:0 }}>{top.pct}%</span>
+                <div style={{ flex:1, height:8, background:'rgba(255,255,255,.08)', borderRadius:4, overflow:'hidden' }}><MatchBar pct={top.pct} /></div>
+                <span style={{ fontSize:11, color:'var(--muted)' }}>kecocokan</span>
+              </div>
+
+              {proof && (
+                <div style={{ display:'flex', alignItems:'center', gap:8, background:'rgba(52,211,153,.08)', border:'1px solid rgba(52,211,153,.2)', borderRadius:10, padding:'8px 14px', marginBottom:14, fontSize:12, color:'#34D399' }}>
+                  <span style={{ fontSize:14, flexShrink:0 }}>✅</span><span>{proof}</span>
+                </div>
+              )}
+
+              <p style={{ fontSize:13.5, color:'var(--muted)', lineHeight:1.7, marginBottom:16 }}>{top.desc}</p>
+
+              <div style={{ background:'rgba(255,255,255,.04)', border:'1px solid var(--border)', borderRadius:14, padding:'14px 16px', marginBottom:16 }}>
+                <div style={{ fontSize:11, fontWeight:700, letterSpacing:1, textTransform:'uppercase', color:GOLD, marginBottom:8 }}>◆ Kenapa ini cocok buat kamu</div>
+                {[whyMsg, `Persona kamu sebagai <strong>${persona.label}</strong> — ${persona.desc.toLowerCase()}.`].map((txt, i) => (
+                  <div key={i} style={{ display:'flex', gap:8, alignItems:'flex-start', marginBottom:6 }}>
+                    <div style={{ width:6, height:6, borderRadius:'50%', background:GOLD, flexShrink:0, marginTop:5 }} />
+                    <div style={{ fontSize:13, color:'var(--muted)', lineHeight:1.5 }} dangerouslySetInnerHTML={{ __html:txt }} />
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ background:'rgba(245,200,66,.06)', border:'1px solid rgba(245,200,66,.2)', borderRadius:14, padding:'12px 16px', marginBottom:16, display:'flex', alignItems:'center', gap:12 }}>
+                <span style={{ fontSize:20, flexShrink:0 }}>💳</span>
+                <div>
+                  <div style={{ fontSize:11, fontWeight:700, letterSpacing:1, textTransform:'uppercase', color:GOLD, marginBottom:3 }}>Biaya Semester 1</div>
+                  <div style={{ fontSize:14, fontWeight:700, color:'var(--text)' }}>{biaya} <span style={{ fontSize:11, color:'var(--muted)', fontWeight:400 }}>/ cicilan 1</span></div>
+                  <div style={{ fontSize:11, color:'var(--muted)' }}>Potongan DP Rp 1,5 jt berlaku s.d. 30 Juni 2026</div>
+                </div>
+              </div>
+
+              <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginBottom:20 }}>
+                {top.karier.map(k => <span key={k} className="qv5-karier-tag">{k}</span>)}
+              </div>
+
+              <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
+                <button onClick={handleDaftar}
+                  style={{ flex:1, minWidth:140, display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:14, borderRadius:14, background:GOLD, color:'#0D0F1A', fontSize:15, fontWeight:800, border:'none', cursor:'pointer', transition:'.2s', fontFamily:"'Plus Jakarta Sans',sans-serif" }}
+                  onMouseOver={e => { e.currentTarget.style.opacity='.9'; }} onMouseOut={e => { e.currentTarget.style.opacity='1'; }}
+                >Daftar Sekarang →</button>
+                <button onClick={handleChat}
+                  style={{ flex:1, minWidth:100, display:'flex', alignItems:'center', justifyContent:'center', gap:6, padding:12, borderRadius:14, background:'var(--card)', color:'#34D399', fontSize:13, fontWeight:600, border:'1.5px solid rgba(52,211,153,.4)', cursor:'pointer', transition:'.2s', fontFamily:"'Plus Jakarta Sans',sans-serif" }}
+                  onMouseOver={e => { e.currentTarget.style.background='var(--green2)'; }} onMouseOut={e => { e.currentTarget.style.background='var(--card)'; }}
+                >💬 Chat WA</button>
+                <button onClick={handleShare}
+                  style={{ flex:1, minWidth:100, display:'flex', alignItems:'center', justifyContent:'center', gap:6, padding:12, borderRadius:14, background:'var(--card)', color:'var(--text)', fontSize:13, fontWeight:600, border:'1.5px solid var(--border2)', cursor:'pointer', transition:'.2s', fontFamily:"'Plus Jakarta Sans',sans-serif" }}
+                  onMouseOver={e => { e.currentTarget.style.borderColor='var(--text)'; }} onMouseOut={e => { e.currentTarget.style.borderColor='var(--border2)'; }}
+                >📤 Share</button>
+              </div>
+            </div>
+
+            {/* Alternatif */}
+            <SectionTitle style={{ marginTop:20 }}>Alternatif yang Juga Cocok</SectionTitle>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))', gap:12, marginBottom:28 }}>
+              {others.map((p, i) => {
+                const f = FAC[p.fac] || { color:GOLD, short:'' };
+                return (
+                  <div key={p.id} className="qv5-other-card" style={{ animationDelay:`${i*0.1}s` }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10 }}>
+                      <div style={{ width:40, height:40, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, flexShrink:0, background:`${f.color}22`, color:f.color }}>{p.emoji}</div>
+                      <div>
+                        <div style={{ fontSize:10, fontWeight:700, letterSpacing:1.5, textTransform:'uppercase', color:f.color, marginBottom:2 }}>{f.short}</div>
+                        <div style={{ fontSize:12, fontWeight:700, color:f.color }}>{p.pct}% cocok</div>
+                      </div>
+                    </div>
+                    <div style={{ height:3, background:'rgba(255,255,255,.08)', borderRadius:2, overflow:'hidden', marginBottom:10 }}>
+                      <div style={{ height:'100%', borderRadius:2, background:f.color, width:`${p.pct}%` }} />
+                    </div>
+                    <div style={{ fontSize:15, fontWeight:700, marginBottom:4, color:'var(--text)' }}>{p.title}</div>
+                    <div style={{ fontSize:12, color:'var(--muted)', lineHeight:1.55, marginBottom:10 }}>{p.desc.substring(0,80)}…</div>
+                    <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+                      {p.tags.map(t => <span key={t} style={{ fontSize:10, fontWeight:500, padding:'2px 8px', borderRadius:10, background:'rgba(255,255,255,.06)', color:'var(--muted)' }}>{t}</span>)}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Irisan */}
+            {top.irisan && top.irisan.length > 0 && (
+              <>
+                <SectionTitle>Prodi yang Beririsan</SectionTitle>
+                <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:28 }}>
+                  {top.irisan.map(iid => {
+                    const ip = PRODI_MAP[iid]; if (!ip) return null;
+                    const ifac = FAC[ip.fac] || { color:GOLD, short:'' };
+                    return (
+                      <div key={iid} style={{ display:'flex', alignItems:'center', gap:12, background:'var(--card)', border:'1px solid var(--border)', borderRadius:14, padding:'14px 16px' }}>
+                        <div style={{ width:10, height:10, borderRadius:'50%', background:ifac.color, flexShrink:0 }} />
+                        <div style={{ flex:1 }}>
+                          <div style={{ fontSize:13, fontWeight:700, color:'var(--text)', marginBottom:2 }}>{ip.emoji} {ip.title} <span style={{ fontSize:10, color:'var(--muted)', fontWeight:400 }}>· {ifac.short}</span></div>
+                          <div style={{ fontSize:11.5, color:'var(--muted)', lineHeight:1.4 }}>{ip.desc.substring(0,65)}…</div>
+                        </div>
+                        <span style={{ color:'var(--muted2)', fontSize:14 }}>›</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+
+            {/* Restart */}
+            <div style={{ textAlign:'center', paddingBottom:40 }}>
+              <button onClick={restartQuiz}
+                style={{ background:'none', border:'1.5px solid var(--border2)', color:'var(--muted)', fontFamily:"'Plus Jakarta Sans',sans-serif", fontSize:13, fontWeight:500, padding:'10px 24px', borderRadius:12, cursor:'pointer', transition:'.2s' }}
+                onMouseOver={e => { e.currentTarget.style.borderColor='var(--text)'; e.currentTarget.style.color='var(--text)'; }}
+                onMouseOut={e  => { e.currentTarget.style.borderColor='var(--border2)'; e.currentTarget.style.color='var(--muted)'; }}
+              >↩ Ulangi dari awal</button>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  return null;
+}
+
+// ── Small helpers ─────────────────────────────────────────
+function SectionTitle({ children, style }) {
+  return (
+    <div style={{ fontSize:11, fontWeight:700, letterSpacing:2, textTransform:'uppercase', color:'var(--muted)', marginBottom:16, display:'flex', alignItems:'center', gap:8, ...style }}>
+      {children}
+      <span style={{ flex:1, height:1, background:'var(--border)', display:'block' }} />
+    </div>
   );
 }
