@@ -509,7 +509,7 @@ const QS = [
 // ============================================================
 // PIXEL HELPERS
 // Mapping event sesuai tabel funnel PMB UNPAS:
-//   Landing page  → PageView        (auto via index.html / GTM)
+//   Landing page  → PageViewQuiz     (auto via index.html / GTM)
 //   Mulai quiz    → QuizStarted     (custom)
 //   Selesai soal  → QuizCompleted   (custom)
 //   Submit data   → Lead ⭐         (standard — utama untuk optimasi Meta Ads)
@@ -543,6 +543,7 @@ function trackLead() {
   window.fbq('track', 'Lead', {
     content_name: 'Quiz Kecocokan Prodi',
     content_category: 'PMB UNPAS',
+    currency: 'IDR',
   });
   console.log('✅ Pixel: Lead fired');
 }

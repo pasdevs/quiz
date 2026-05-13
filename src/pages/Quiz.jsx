@@ -305,7 +305,7 @@ function calcScores(dimScores) {
 const pixelReady = () => typeof window.fbq === 'function';
 function trackQuizStart()           { if (pixelReady()) window.fbq('trackCustom','QuizStarted'); }
 function trackQuizCompleted()       { if (pixelReady()) window.fbq('trackCustom','QuizCompleted'); }
-function trackLead()                { if (pixelReady()) window.fbq('track','Lead',{ content_name:'Quiz Kecocokan Prodi', content_category:'PMB UNPAS' }); }
+function trackLead()                { if (pixelReady()) window.fbq('track','Lead',{ content_name:'Quiz Kecocokan Prodi', content_category:'PMB UNPAS', currency:'IDR' }); }
 function trackViewContent(top)      { if (pixelReady()) window.fbq('track','ViewContent',{ content_name:top.title, content_category:FAC[top.fac]?.name||'', content_ids:[top.id], value:1, currency:'IDR' }); }
 function trackInitiateCheckout(n)   { if (pixelReady()) window.fbq('track','InitiateCheckout',{ content_name: n || 'Daftar PMB UNPAS' }); }
 function trackContact(n)            { if (pixelReady()) window.fbq('track','Contact',{ content_name: n }); }
